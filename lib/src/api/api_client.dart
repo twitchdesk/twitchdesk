@@ -736,13 +736,14 @@ class ApiClient {
   /// Builds an overlay-friendly GET URL for the public AI alert fire endpoint.
   ///
   /// The returned URL keeps the existing `token` query param and adds:
-  /// - `event_id` (required)
+  /// - `event_id` (optional)
   /// - `viewer` (optional)
   /// - `message` (optional)
-  /// - `format` = json|text|html
+  ///
+  /// Note: the backend endpoint always returns plain text.
   Uri aiAlertFireGetUrl({
     required String publicUrl,
-    required String eventId,
+    String? eventId,
     String? viewer,
     String? message,
     String? eventType,
@@ -753,14 +754,13 @@ class ApiClient {
     int? raidViewers,
     String? timestamp,
     String? channel,
-    String format = 'json',
   }) {
     final base = Uri.parse(publicUrl);
     final qp = <String, String>{
       ...base.queryParameters,
-      'event_id': eventId,
-      'format': format,
     };
+    final eid = eventId?.trim();
+    if (eid != null && eid.isNotEmpty) qp['event_id'] = eid;
     final v = viewer?.trim();
     if (v != null && v.isNotEmpty) qp['viewer'] = v;
     final m = message?.trim();
@@ -783,11 +783,9 @@ class ApiClient {
   }
 
   /// Fires the public AI alert endpoint via GET.
-  ///
-  /// Prefer `format=json` for programmatic testing (it returns AiAlertFireResponse).
   Future<AiAlertFireResponse> aiAlertFireGet({
     required String publicUrl,
-    required String eventId,
+    String? eventId,
     String? viewer,
     String? message,
     String? eventType,
@@ -812,14 +810,20 @@ class ApiClient {
       raidViewers: raidViewers,
       timestamp: timestamp,
       channel: channel,
-      format: 'json',
     );
     final resp = await _http.get(url);
-    if (resp.statusCode != 200) {
-      throw ApiException(resp.statusCode, _bodyOrReason(resp));
+    // Backend always returns text/plain.
+    if (resp.statusCode == 200) {
+      final text = resp.body.trim();
+      if (text.isEmpty) {
+        return AiAlertFireResponse(status: 'empty', text: null);
+      }
+      return AiAlertFireResponse(status: 'ok', text: text);
     }
-    final json = jsonDecode(resp.body) as Map<String, dynamic>;
-    return AiAlertFireResponse.fromJson(json);
+    if (resp.statusCode == 429) {
+      return AiAlertFireResponse(status: 'cooldown', text: null);
+    }
+    throw ApiException(resp.statusCode, _bodyOrReason(resp));
   }
 
   Future<AiAlertPreviewResponse> aiAlertPreview({

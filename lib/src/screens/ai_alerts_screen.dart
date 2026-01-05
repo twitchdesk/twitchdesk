@@ -732,6 +732,7 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
     required TextEditingController placeholderCtrl,
     required VoidCallback onChanged,
   }) {
+    final isNarrow = MediaQuery.sizeOf(context).width < 420;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -745,7 +746,7 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
           ),
           const SizedBox(width: 8),
           SizedBox(
-            width: 220,
+            width: isNarrow ? 160 : 220,
             child: TextField(
               controller: placeholderCtrl,
               onChanged: (_) => onChanged(),
@@ -1142,15 +1143,16 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
     Future<void> testFireGet(StateSetter setInner) async {
       final raw = currentPub.publicUrl;
       final url = _withUsername(raw);
-      final eventId = testEventIdCtrl.text.trim();
       if (url == null || url.isEmpty) {
         setInner(() => localError = 'Public URL not available (check PUBLIC_BASE_URL + enable).');
         return;
       }
-      if (eventId.isEmpty) {
-        setInner(() => localError = 'Missing event_id');
-        return;
-      }
+
+      final eventId = (selectedParams['event_id'] == true)
+          ? testEventIdCtrl.text.trim().isEmpty
+              ? null
+              : testEventIdCtrl.text.trim()
+          : null;
 
       try {
         final res = await widget.api.aiAlertFireGet(
@@ -1427,8 +1429,9 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
             }
 
             final out = <String, String>{};
-            // event_id is required; always include.
-            out['event_id'] = ph(phEventIdCtrl, 'event_id');
+            if (selectedParams['event_id'] == true) {
+              out['event_id'] = ph(phEventIdCtrl, 'event_id');
+            }
 
             if (selectedParams['viewer'] == true) out['viewer'] = ph(phViewerCtrl, 'username');
             if (selectedParams['message'] == true) out['message'] = ph(phMessageCtrl, 'message');
@@ -1460,10 +1463,12 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
             }
 
             final out = <String, String>{};
-            out['event_id'] = val(
-              testEventIdCtrl,
-              fallback: 'test-${DateTime.now().millisecondsSinceEpoch}',
-            );
+            if (selectedParams['event_id'] == true) {
+              out['event_id'] = val(
+                testEventIdCtrl,
+                fallback: 'test-${DateTime.now().millisecondsSinceEpoch}',
+              );
+            }
 
             if (selectedParams['viewer'] == true) {
               final v = testUsernameCtrl.text.trim();
@@ -1597,10 +1602,16 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
             return await saveInDialog(setInner);
           }
 
+          final isNarrow = MediaQuery.sizeOf(context).width < 600;
+
           return AlertDialog(
             title: Text('Edit: ${detail!.name}'),
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: isNarrow ? 12 : 40,
+              vertical: isNarrow ? 12 : 24,
+            ),
             content: SizedBox(
-              width: 720,
+              width: isNarrow ? (MediaQuery.sizeOf(context).width - 24) : 720,
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1959,9 +1970,12 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     const SizedBox(height: 8),
                     _buildParamPickerRow(
                       context,
-                      label: 'event_id (required)',
-                      enabled: true,
-                      onEnabledChanged: null,
+                      label: 'event_id (recommended)',
+                      enabled: selectedParams['event_id'] == true,
+                      onEnabledChanged: (v) => setInner(() {
+                        selectedParams['event_id'] = v;
+                        cacheTestFields();
+                      }),
                       placeholderCtrl: phEventIdCtrl,
                       onChanged: () => setInner(() {}),
                     ),
@@ -2562,6 +2576,7 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
   Widget build(BuildContext context) {
     final connected = _tokenStatus?.connected;
     final alerts = _alerts?.alerts ?? const [];
+    final isNarrow = MediaQuery.sizeOf(context).width < 520;
 
     return Scaffold(
       appBar: AppBar(
@@ -2583,7 +2598,7 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 900),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isNarrow ? 12 : 16),
             child: ListView(
               children: [
                 if (_busy) const LinearProgressIndicator(),
@@ -2623,23 +2638,39 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                           obscureText: true,
                         ),
                         const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton(
+                        if (isNarrow)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              FilledButton(
                                 onPressed: _busy ? null : _saveToken,
                                 child: const Text('Save token'),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: OutlinedButton(
+                              const SizedBox(height: 12),
+                              OutlinedButton(
                                 onPressed: (_busy || connected != true) ? null : _disconnectToken,
                                 child: const Text('Disconnect'),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          )
+                        else
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: _busy ? null : _saveToken,
+                                  child: const Text('Save token'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: (_busy || connected != true) ? null : _disconnectToken,
+                                  child: const Text('Disconnect'),
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
