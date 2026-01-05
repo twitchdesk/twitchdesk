@@ -153,6 +153,22 @@ class AiAlertDetailResponse {
     required this.isEnabled,
     required this.cooldownMs,
     required this.updatedAt,
+
+    // Style
+    required this.durationMs,
+    required this.textColor,
+    required this.fontFamily,
+    required this.fontSizePx,
+
+    // Safety / quality
+    required this.maxOutputChars,
+    required this.tone,
+    required this.language,
+    required this.noSwearing,
+
+    // Session/context
+    required this.sessionEnabled,
+    required this.sessionMaxEntries,
   });
 
   final String id;
@@ -162,6 +178,22 @@ class AiAlertDetailResponse {
   final int cooldownMs;
   final String updatedAt;
 
+  // Style
+  final int durationMs;
+  final String textColor;
+  final String fontFamily;
+  final int fontSizePx;
+
+  // Safety / quality
+  final int maxOutputChars;
+  final String tone;
+  final String language;
+  final bool noSwearing;
+
+  // Session/context
+  final bool sessionEnabled;
+  final int sessionMaxEntries;
+
   factory AiAlertDetailResponse.fromJson(Map<String, dynamic> json) {
     return AiAlertDetailResponse(
       id: (json['id'] as String?) ?? '',
@@ -170,21 +202,129 @@ class AiAlertDetailResponse {
       isEnabled: (json['is_enabled'] as bool?) ?? false,
       cooldownMs: (json['cooldown_ms'] as num?)?.toInt() ?? 0,
       updatedAt: (json['updated_at'] as String?) ?? '',
+
+      durationMs: (json['duration_ms'] as num?)?.toInt() ?? 4500,
+      textColor: (json['text_color'] as String?)?.trim() ?? 'white',
+      fontFamily:
+          (json['font_family'] as String?)?.trim() ?? 'system-ui, Segoe UI, Arial, sans-serif',
+      fontSizePx: (json['font_size_px'] as num?)?.toInt() ?? 32,
+
+      maxOutputChars: (json['max_output_chars'] as num?)?.toInt() ?? 200,
+      tone: (json['tone'] as String?)?.trim() ?? '',
+      language: (json['language'] as String?)?.trim() ?? '',
+      noSwearing: (json['no_swearing'] as bool?) ?? false,
+
+      sessionEnabled: (json['session_enabled'] as bool?) ?? false,
+      sessionMaxEntries: (json['session_max_entries'] as num?)?.toInt() ?? 10,
     );
   }
 }
 
 class AiAlertPublicStatusResponse {
-  AiAlertPublicStatusResponse({required this.enabled, required this.publicUrl});
+  AiAlertPublicStatusResponse({
+    required this.enabled,
+    required this.publicUrl,
+    required this.overlayUrl,
+    required this.streamUrl,
+  });
 
   final bool enabled;
   final String? publicUrl;
+  final String? overlayUrl;
+  final String? streamUrl;
 
   factory AiAlertPublicStatusResponse.fromJson(Map<String, dynamic> json) {
     final url = (json['public_url'] as String?)?.trim();
+    final overlay = (json['overlay_url'] as String?)?.trim();
+    final stream = (json['stream_url'] as String?)?.trim();
     return AiAlertPublicStatusResponse(
       enabled: (json['enabled'] as bool?) ?? false,
       publicUrl: (url == null || url.isEmpty) ? null : url,
+      overlayUrl: (overlay == null || overlay.isEmpty) ? null : overlay,
+      streamUrl: (stream == null || stream.isEmpty) ? null : stream,
+    );
+  }
+}
+
+class AiAlertPreviewResponse {
+  AiAlertPreviewResponse({required this.renderedPrompt, required this.effectivePrompt});
+
+  final String renderedPrompt;
+  final String effectivePrompt;
+
+  factory AiAlertPreviewResponse.fromJson(Map<String, dynamic> json) {
+    return AiAlertPreviewResponse(
+      renderedPrompt: (json['rendered_prompt'] as String?) ?? '',
+      effectivePrompt: (json['effective_prompt'] as String?) ?? '',
+    );
+  }
+}
+
+class AiAlertSessionResponse {
+  AiAlertSessionResponse({
+    required this.sessionEnabled,
+    required this.isActive,
+    required this.sessionId,
+    required this.contextEntries,
+  });
+
+  final bool sessionEnabled;
+  final bool isActive;
+  final String? sessionId;
+  final int contextEntries;
+
+  factory AiAlertSessionResponse.fromJson(Map<String, dynamic> json) {
+    final sid = (json['session_id'] as String?)?.trim();
+    return AiAlertSessionResponse(
+      sessionEnabled: (json['session_enabled'] as bool?) ?? false,
+      isActive: (json['is_active'] as bool?) ?? false,
+      sessionId: (sid == null || sid.isEmpty) ? null : sid,
+      contextEntries: (json['context_entries'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class AiAlertStatsDay {
+  AiAlertStatsDay({
+    required this.day,
+    required this.processedCount,
+    required this.duplicateCount,
+    required this.cooldownCount,
+    required this.errorCount,
+    required this.openaiErrorCount,
+  });
+
+  final String day;
+  final int processedCount;
+  final int duplicateCount;
+  final int cooldownCount;
+  final int errorCount;
+  final int openaiErrorCount;
+
+  factory AiAlertStatsDay.fromJson(Map<String, dynamic> json) {
+    return AiAlertStatsDay(
+      day: (json['day'] as String?) ?? '',
+      processedCount: (json['processed_count'] as num?)?.toInt() ?? 0,
+      duplicateCount: (json['duplicate_count'] as num?)?.toInt() ?? 0,
+      cooldownCount: (json['cooldown_count'] as num?)?.toInt() ?? 0,
+      errorCount: (json['error_count'] as num?)?.toInt() ?? 0,
+      openaiErrorCount: (json['openai_error_count'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class AiAlertStatsResponse {
+  AiAlertStatsResponse({required this.days});
+
+  final List<AiAlertStatsDay> days;
+
+  factory AiAlertStatsResponse.fromJson(Map<String, dynamic> json) {
+    final list = (json['days'] as List<dynamic>?) ?? const [];
+    return AiAlertStatsResponse(
+      days: list
+          .whereType<Map<String, dynamic>>()
+          .map(AiAlertStatsDay.fromJson)
+          .toList(growable: false),
     );
   }
 }
@@ -366,6 +506,17 @@ class ApiClient {
     required String prompt,
     required bool isEnabled,
     required int cooldownMs,
+
+    int durationMs = 4500,
+    String textColor = 'white',
+    String fontFamily = 'system-ui, Segoe UI, Arial, sans-serif',
+    int fontSizePx = 32,
+    int maxOutputChars = 200,
+    String tone = '',
+    String language = '',
+    bool noSwearing = false,
+    bool sessionEnabled = false,
+    int sessionMaxEntries = 10,
   }) async {
     final resp = await _http.post(
       AppConfig.apiUri('/v1/ai/alerts'),
@@ -378,6 +529,17 @@ class ApiClient {
         'prompt': prompt,
         'is_enabled': isEnabled,
         'cooldown_ms': cooldownMs,
+
+        'duration_ms': durationMs,
+        'text_color': textColor,
+        'font_family': fontFamily,
+        'font_size_px': fontSizePx,
+        'max_output_chars': maxOutputChars,
+        'tone': tone,
+        'language': language,
+        'no_swearing': noSwearing,
+        'session_enabled': sessionEnabled,
+        'session_max_entries': sessionMaxEntries,
       }),
     );
     if (resp.statusCode != 201) {
@@ -409,6 +571,17 @@ class ApiClient {
     required String prompt,
     required bool isEnabled,
     required int cooldownMs,
+
+    int durationMs = 4500,
+    String textColor = 'white',
+    String fontFamily = 'system-ui, Segoe UI, Arial, sans-serif',
+    int fontSizePx = 32,
+    int maxOutputChars = 200,
+    String tone = '',
+    String language = '',
+    bool noSwearing = false,
+    bool sessionEnabled = false,
+    int sessionMaxEntries = 10,
   }) async {
     final resp = await _http.put(
       AppConfig.apiUri('/v1/ai/alerts/$alertId'),
@@ -421,6 +594,17 @@ class ApiClient {
         'prompt': prompt,
         'is_enabled': isEnabled,
         'cooldown_ms': cooldownMs,
+
+        'duration_ms': durationMs,
+        'text_color': textColor,
+        'font_family': fontFamily,
+        'font_size_px': fontSizePx,
+        'max_output_chars': maxOutputChars,
+        'tone': tone,
+        'language': language,
+        'no_swearing': noSwearing,
+        'session_enabled': sessionEnabled,
+        'session_max_entries': sessionMaxEntries,
       }),
     );
     if (resp.statusCode != 200) {
@@ -491,6 +675,15 @@ class ApiClient {
     required String eventId,
     String? username,
     String? message,
+
+    String? eventType,
+    String? tier,
+    int? months,
+    int? bits,
+    double? amount,
+    int? raidViewers,
+    String? timestamp,
+    String? channel,
   }) async {
     final resp = await _http.post(
       Uri.parse(publicUrl),
@@ -499,6 +692,15 @@ class ApiClient {
         'event_id': eventId,
         if (username != null) 'username': username,
         if (message != null) 'message': message,
+
+        if (eventType != null) 'event_type': eventType,
+        if (tier != null) 'tier': tier,
+        if (months != null) 'months': months,
+        if (bits != null) 'bits': bits,
+        if (amount != null) 'amount': amount,
+        if (raidViewers != null) 'raid_viewers': raidViewers,
+        if (timestamp != null) 'timestamp': timestamp,
+        if (channel != null) 'channel': channel,
       }),
     );
     if (resp.statusCode != 200) {
@@ -520,6 +722,14 @@ class ApiClient {
     required String eventId,
     String? viewer,
     String? message,
+    String? eventType,
+    String? tier,
+    int? months,
+    int? bits,
+    double? amount,
+    int? raidViewers,
+    String? timestamp,
+    String? channel,
     String format = 'json',
   }) {
     final base = Uri.parse(publicUrl);
@@ -533,6 +743,19 @@ class ApiClient {
     final m = message?.trim();
     if (m != null && m.isNotEmpty) qp['message'] = m;
 
+    final et = eventType?.trim();
+    if (et != null && et.isNotEmpty) qp['event_type'] = et;
+    final ti = tier?.trim();
+    if (ti != null && ti.isNotEmpty) qp['tier'] = ti;
+    if (months != null) qp['months'] = months.toString();
+    if (bits != null) qp['bits'] = bits.toString();
+    if (amount != null) qp['amount'] = amount.toString();
+    if (raidViewers != null) qp['raid_viewers'] = raidViewers.toString();
+    final ts = timestamp?.trim();
+    if (ts != null && ts.isNotEmpty) qp['timestamp'] = ts;
+    final ch = channel?.trim();
+    if (ch != null && ch.isNotEmpty) qp['channel'] = ch;
+
     return base.replace(queryParameters: qp);
   }
 
@@ -544,12 +767,28 @@ class ApiClient {
     required String eventId,
     String? viewer,
     String? message,
+    String? eventType,
+    String? tier,
+    int? months,
+    int? bits,
+    double? amount,
+    int? raidViewers,
+    String? timestamp,
+    String? channel,
   }) async {
     final url = aiAlertFireGetUrl(
       publicUrl: publicUrl,
       eventId: eventId,
       viewer: viewer,
       message: message,
+      eventType: eventType,
+      tier: tier,
+      months: months,
+      bits: bits,
+      amount: amount,
+      raidViewers: raidViewers,
+      timestamp: timestamp,
+      channel: channel,
       format: 'json',
     );
     final resp = await _http.get(url);
@@ -558,6 +797,126 @@ class ApiClient {
     }
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
     return AiAlertFireResponse.fromJson(json);
+  }
+
+  Future<AiAlertPreviewResponse> aiAlertPreview({
+    required String accessToken,
+    required String alertId,
+    String? username,
+    String? message,
+    String? eventId,
+    String? eventType,
+    String? tier,
+    int? months,
+    int? bits,
+    double? amount,
+    int? raidViewers,
+    String? timestamp,
+    String? channel,
+  }) async {
+    final resp = await _http.post(
+      AppConfig.apiUri('/v1/ai/alerts/$alertId/preview'),
+      headers: {
+        'authorization': 'Bearer $accessToken',
+        'content-type': 'application/json',
+      },
+      body: jsonEncode({
+        if (eventId != null) 'event_id': eventId,
+        if (username != null) 'username': username,
+        if (message != null) 'message': message,
+        if (eventType != null) 'event_type': eventType,
+        if (tier != null) 'tier': tier,
+        if (months != null) 'months': months,
+        if (bits != null) 'bits': bits,
+        if (amount != null) 'amount': amount,
+        if (raidViewers != null) 'raid_viewers': raidViewers,
+        if (timestamp != null) 'timestamp': timestamp,
+        if (channel != null) 'channel': channel,
+      }),
+    );
+    if (resp.statusCode != 200) {
+      throw ApiException(resp.statusCode, _bodyOrReason(resp));
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    return AiAlertPreviewResponse.fromJson(json);
+  }
+
+  Future<AiAlertSessionResponse> aiAlertSessionGet({
+    required String accessToken,
+    required String alertId,
+  }) async {
+    final resp = await _http.get(
+      AppConfig.apiUri('/v1/ai/alerts/$alertId/session'),
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+    if (resp.statusCode != 200) {
+      throw ApiException(resp.statusCode, _bodyOrReason(resp));
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    return AiAlertSessionResponse.fromJson(json);
+  }
+
+  Future<AiAlertSessionResponse> aiAlertSessionStart({
+    required String accessToken,
+    required String alertId,
+  }) async {
+    final resp = await _http.post(
+      AppConfig.apiUri('/v1/ai/alerts/$alertId/session/start'),
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+    if (resp.statusCode != 200) {
+      throw ApiException(resp.statusCode, _bodyOrReason(resp));
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    return AiAlertSessionResponse.fromJson(json);
+  }
+
+  Future<AiAlertSessionResponse> aiAlertSessionStop({
+    required String accessToken,
+    required String alertId,
+  }) async {
+    final resp = await _http.post(
+      AppConfig.apiUri('/v1/ai/alerts/$alertId/session/stop'),
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+    if (resp.statusCode != 200) {
+      throw ApiException(resp.statusCode, _bodyOrReason(resp));
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    return AiAlertSessionResponse.fromJson(json);
+  }
+
+  Future<AiAlertSessionResponse> aiAlertSessionReset({
+    required String accessToken,
+    required String alertId,
+  }) async {
+    final resp = await _http.post(
+      AppConfig.apiUri('/v1/ai/alerts/$alertId/session/reset'),
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+    if (resp.statusCode != 200) {
+      throw ApiException(resp.statusCode, _bodyOrReason(resp));
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    return AiAlertSessionResponse.fromJson(json);
+  }
+
+  Future<AiAlertStatsResponse> aiAlertStats({
+    required String accessToken,
+    required String alertId,
+    int days = 7,
+  }) async {
+    final uri = AppConfig.apiUri('/v1/ai/alerts/$alertId/stats')
+        .replace(queryParameters: {'days': days.toString()});
+    final resp = await _http.get(
+      uri,
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+    if (resp.statusCode != 200) {
+      throw ApiException(resp.statusCode, _bodyOrReason(resp));
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    return AiAlertStatsResponse.fromJson(json);
   }
 
   String _bodyOrReason(http.Response resp) {

@@ -39,12 +39,12 @@ class _VariablesHint extends StatelessWidget {
       children: [
         const _HelpIcon(
           message:
-              'Du kan bruge variabler i prompten. De bliver udfyldt når alerten trigges.',
+              'Du kan bruge variabler i prompten. De bliver udfyldt når alerten trigges. Nogle variabler kræver at dit tool sender de ekstra felter (event_type, tier, months, bits, amount, raid_viewers osv.).',
         ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            'Variabler: {{username}} (viewer/navn) og {{message}} (valgfri tekst).',
+            'Variabler: {{eventId}}, {{username}}, {{message}}, {{eventType}}, {{tier}}, {{months}}, {{bits}}, {{amount}}, {{raidViewers}}, {{timestamp}}, {{channel}}.',
             style: style,
           ),
         ),
@@ -88,6 +88,14 @@ class _OverlayVariablesHint extends StatelessWidget {
         ),
         Text(
           '- message: bliver til {{message}}',
+          style: style,
+        ),
+        Text(
+          '- event_type: bliver til {{eventType}} (fx FOLLOW/SUB/RAID)',
+          style: style,
+        ),
+        Text(
+          '- tier/months/bits/amount/raid_viewers/channel: ekstra felter',
           style: style,
         ),
         Text(
@@ -330,6 +338,22 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
     var enabled = true;
     final cooldownCtrl = TextEditingController(text: '0');
 
+    // Style
+    final durationCtrl = TextEditingController(text: '4500');
+    final textColorCtrl = TextEditingController(text: 'white');
+    final fontFamilyCtrl = TextEditingController(text: 'system-ui, Segoe UI, Arial, sans-serif');
+    final fontSizeCtrl = TextEditingController(text: '32');
+
+    // Safety
+    final maxOutputCtrl = TextEditingController(text: '200');
+    final toneCtrl = TextEditingController(text: '');
+    final languageCtrl = TextEditingController(text: 'da');
+    var noSwearing = false;
+
+    // Session
+    var sessionEnabled = false;
+    final sessionMaxEntriesCtrl = TextEditingController(text: '10');
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -378,6 +402,126 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 ),
+
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Style (overlay)',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: durationCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Duration (ms)',
+                    suffixIcon: _HelpIcon(
+                      message: 'Hvor længe teksten bliver vist på overlay efter et event.',
+                    ),
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: textColorCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Text color (CSS)',
+                    hintText: 'white / #ffffff / rgb(255,255,255)',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: fontFamilyCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Font family (CSS)',
+                    hintText: 'system-ui, Segoe UI, Arial, sans-serif',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: fontSizeCtrl,
+                  decoration: const InputDecoration(labelText: 'Font size (px)'),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
+
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Safety / quality',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: maxOutputCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Max output chars',
+                    suffixIcon: _HelpIcon(
+                      message: 'Sikkerhedsgrænse for længden af AI output (truncates).',
+                    ),
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: toneCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Tone (optional)',
+                    hintText: 'fx “hype”, “rolig”, “tør humor”',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: languageCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Language (optional)',
+                    hintText: 'fx da / en',
+                  ),
+                ),
+                SwitchListTile(
+                  value: noSwearing,
+                  onChanged: (v) => noSwearing = v,
+                  title: const Text('No swearing'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Session / context',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                SwitchListTile(
+                  value: sessionEnabled,
+                  onChanged: (v) => sessionEnabled = v,
+                  title: const Text('Enable session memory'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: sessionMaxEntriesCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Max context entries',
+                    suffixIcon: _HelpIcon(
+                      message: 'Hvor mange tidligere entries der bruges som kontekst i prompten.',
+                    ),
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
               ],
             ),
           ),
@@ -402,6 +546,16 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
     final cooldownMs = int.tryParse(cooldownCtrl.text.trim()) ?? 0;
     if (name.isEmpty || prompt.isEmpty) return;
 
+    int parseIntOr(TextEditingController c, int fallback) {
+      final v = int.tryParse(c.text.trim());
+      return v ?? fallback;
+    }
+
+    final durationMs = parseIntOr(durationCtrl, 4500);
+    final fontSizePx = parseIntOr(fontSizeCtrl, 32);
+    final maxOutputChars = parseIntOr(maxOutputCtrl, 200);
+    final sessionMaxEntries = parseIntOr(sessionMaxEntriesCtrl, 10);
+
     setState(() {
       _busy = true;
       _error = null;
@@ -414,6 +568,19 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
         prompt: prompt,
         isEnabled: enabled,
         cooldownMs: cooldownMs,
+
+        durationMs: durationMs,
+        textColor: textColorCtrl.text.trim().isEmpty ? 'white' : textColorCtrl.text.trim(),
+        fontFamily: fontFamilyCtrl.text.trim().isEmpty
+            ? 'system-ui, Segoe UI, Arial, sans-serif'
+            : fontFamilyCtrl.text.trim(),
+        fontSizePx: fontSizePx,
+        maxOutputChars: maxOutputChars,
+        tone: toneCtrl.text.trim(),
+        language: languageCtrl.text.trim(),
+        noSwearing: noSwearing,
+        sessionEnabled: sessionEnabled,
+        sessionMaxEntries: sessionMaxEntries,
       );
       await _load();
     } on ApiException catch (e) {
@@ -476,13 +643,57 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
     final cooldownCtrl = TextEditingController(text: detail.cooldownMs.toString());
     var enabled = detail.isEnabled;
 
+    // Style
+    final durationCtrl = TextEditingController(text: detail.durationMs.toString());
+    final textColorCtrl = TextEditingController(text: detail.textColor);
+    final fontFamilyCtrl = TextEditingController(text: detail.fontFamily);
+    final fontSizeCtrl = TextEditingController(text: detail.fontSizePx.toString());
+
+    // Safety
+    final maxOutputCtrl = TextEditingController(text: detail.maxOutputChars.toString());
+    final toneCtrl = TextEditingController(text: detail.tone);
+    final languageCtrl = TextEditingController(text: detail.language);
+    var noSwearing = detail.noSwearing;
+
+    // Session
+    var sessionEnabled = detail.sessionEnabled;
+    final sessionMaxEntriesCtrl = TextEditingController(text: detail.sessionMaxEntries.toString());
+
     final testEventIdCtrl = TextEditingController(text: 'test-${DateTime.now().millisecondsSinceEpoch}');
     final testUsernameCtrl = TextEditingController(text: _username ?? '');
     final testMessageCtrl = TextEditingController(text: 'Hello from TwitchDesk');
 
+    final testEventTypeCtrl = TextEditingController(text: 'FOLLOW');
+    final testTierCtrl = TextEditingController(text: '');
+    final testMonthsCtrl = TextEditingController(text: '');
+    final testBitsCtrl = TextEditingController(text: '');
+    final testAmountCtrl = TextEditingController(text: '');
+    final testRaidViewersCtrl = TextEditingController(text: '');
+    final testChannelCtrl = TextEditingController(text: '');
+
     AiAlertPublicStatusResponse currentPub = pub;
     AiAlertFireResponse? lastFire;
+    AiAlertPreviewResponse? preview;
+    AiAlertSessionResponse? session;
+    AiAlertStatsResponse? stats;
     String? localError;
+
+    int parseIntOr(TextEditingController c, int fallback) {
+      final v = int.tryParse(c.text.trim());
+      return v ?? fallback;
+    }
+
+    int? parseOptInt(TextEditingController c) {
+      final t = c.text.trim();
+      if (t.isEmpty) return null;
+      return int.tryParse(t);
+    }
+
+    double? parseOptDouble(TextEditingController c) {
+      final t = c.text.trim();
+      if (t.isEmpty) return null;
+      return double.tryParse(t);
+    }
 
     Future<void> refreshPublic(StateSetter setInner) async {
       try {
@@ -548,6 +759,15 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
           eventId: eventId,
           username: testUsernameCtrl.text.trim().isEmpty ? null : testUsernameCtrl.text.trim(),
           message: testMessageCtrl.text.trim().isEmpty ? null : testMessageCtrl.text.trim(),
+
+          eventType: testEventTypeCtrl.text.trim().isEmpty ? null : testEventTypeCtrl.text.trim(),
+          tier: testTierCtrl.text.trim().isEmpty ? null : testTierCtrl.text.trim(),
+          months: parseOptInt(testMonthsCtrl),
+          bits: parseOptInt(testBitsCtrl),
+          amount: parseOptDouble(testAmountCtrl),
+          raidViewers: parseOptInt(testRaidViewersCtrl),
+          timestamp: DateTime.now().toUtc().toIso8601String(),
+          channel: testChannelCtrl.text.trim().isEmpty ? null : testChannelCtrl.text.trim(),
         );
         setInner(() {
           lastFire = res;
@@ -579,9 +799,132 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
           eventId: eventId,
           viewer: testUsernameCtrl.text.trim().isEmpty ? null : testUsernameCtrl.text.trim(),
           message: testMessageCtrl.text.trim().isEmpty ? null : testMessageCtrl.text.trim(),
+
+          eventType: testEventTypeCtrl.text.trim().isEmpty ? null : testEventTypeCtrl.text.trim(),
+          tier: testTierCtrl.text.trim().isEmpty ? null : testTierCtrl.text.trim(),
+          months: parseOptInt(testMonthsCtrl),
+          bits: parseOptInt(testBitsCtrl),
+          amount: parseOptDouble(testAmountCtrl),
+          raidViewers: parseOptInt(testRaidViewersCtrl),
+          timestamp: DateTime.now().toUtc().toIso8601String(),
+          channel: testChannelCtrl.text.trim().isEmpty ? null : testChannelCtrl.text.trim(),
         );
         setInner(() {
           lastFire = res;
+          localError = null;
+        });
+      } on ApiException catch (e) {
+        setInner(() => localError = e.message);
+      } catch (e) {
+        setInner(() => localError = e.toString());
+      }
+    }
+
+    Future<void> runPreview(StateSetter setInner) async {
+      try {
+        final res = await widget.api.aiAlertPreview(
+          accessToken: widget.accessToken,
+          alertId: item.id,
+          eventId: testEventIdCtrl.text.trim().isEmpty ? null : testEventIdCtrl.text.trim(),
+          username: testUsernameCtrl.text.trim().isEmpty ? null : testUsernameCtrl.text.trim(),
+          message: testMessageCtrl.text.trim().isEmpty ? null : testMessageCtrl.text.trim(),
+          eventType: testEventTypeCtrl.text.trim().isEmpty ? null : testEventTypeCtrl.text.trim(),
+          tier: testTierCtrl.text.trim().isEmpty ? null : testTierCtrl.text.trim(),
+          months: parseOptInt(testMonthsCtrl),
+          bits: parseOptInt(testBitsCtrl),
+          amount: parseOptDouble(testAmountCtrl),
+          raidViewers: parseOptInt(testRaidViewersCtrl),
+          timestamp: DateTime.now().toUtc().toIso8601String(),
+          channel: testChannelCtrl.text.trim().isEmpty ? null : testChannelCtrl.text.trim(),
+        );
+        setInner(() {
+          preview = res;
+          localError = null;
+        });
+      } on ApiException catch (e) {
+        setInner(() => localError = e.message);
+      } catch (e) {
+        setInner(() => localError = e.toString());
+      }
+    }
+
+    Future<void> refreshSession(StateSetter setInner) async {
+      try {
+        final res = await widget.api.aiAlertSessionGet(
+          accessToken: widget.accessToken,
+          alertId: item.id,
+        );
+        setInner(() {
+          session = res;
+          localError = null;
+        });
+      } on ApiException catch (e) {
+        setInner(() => localError = e.message);
+      } catch (e) {
+        setInner(() => localError = e.toString());
+      }
+    }
+
+    Future<void> sessionStart(StateSetter setInner) async {
+      try {
+        final res = await widget.api.aiAlertSessionStart(
+          accessToken: widget.accessToken,
+          alertId: item.id,
+        );
+        setInner(() {
+          session = res;
+          localError = null;
+        });
+      } on ApiException catch (e) {
+        setInner(() => localError = e.message);
+      } catch (e) {
+        setInner(() => localError = e.toString());
+      }
+    }
+
+    Future<void> sessionStop(StateSetter setInner) async {
+      try {
+        final res = await widget.api.aiAlertSessionStop(
+          accessToken: widget.accessToken,
+          alertId: item.id,
+        );
+        setInner(() {
+          session = res;
+          localError = null;
+        });
+      } on ApiException catch (e) {
+        setInner(() => localError = e.message);
+      } catch (e) {
+        setInner(() => localError = e.toString());
+      }
+    }
+
+    Future<void> sessionReset(StateSetter setInner) async {
+      try {
+        final res = await widget.api.aiAlertSessionReset(
+          accessToken: widget.accessToken,
+          alertId: item.id,
+        );
+        setInner(() {
+          session = res;
+          localError = null;
+        });
+      } on ApiException catch (e) {
+        setInner(() => localError = e.message);
+      } catch (e) {
+        setInner(() => localError = e.toString());
+      }
+    }
+
+    Future<void> refreshStats(StateSetter setInner) async {
+      try {
+        final res = await widget.api.aiAlertStats(
+          accessToken: widget.accessToken,
+          alertId: item.id,
+          days: 7,
+        );
+        setInner(() {
+          stats = res;
           localError = null;
         });
       } on ApiException catch (e) {
@@ -599,6 +942,18 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
           final rawUrl = currentPub.publicUrl;
           final getTemplate = rawUrl == null ? null : _overlayUrlTemplate(rawUrl);
           final getTemplateWithUser = canCopy == null ? null : _overlayUrlTemplate(canCopy);
+
+          final overlayUrl = _withUsername(currentPub.overlayUrl);
+          final streamUrl = _withUsername(currentPub.streamUrl);
+
+          // Lazy-load session/stats once the dialog is visible.
+          // This avoids extra latency before the editor opens.
+          if (session == null && stats == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              refreshSession(setInner);
+              refreshStats(setInner);
+            });
+          }
 
           return AlertDialog(
             title: Text('Edit: ${detail!.name}'),
@@ -650,6 +1005,155 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     ),
+
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Style (overlay)',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: durationCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Duration (ms)',
+                        suffixIcon: _HelpIcon(message: 'Hvor længe teksten bliver vist på overlay.'),
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: textColorCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Text color (CSS)',
+                        hintText: 'white / #ffffff / rgb(...)',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: fontFamilyCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Font family (CSS)',
+                        hintText: 'system-ui, Segoe UI, Arial, sans-serif',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: fontSizeCtrl,
+                      decoration: const InputDecoration(labelText: 'Font size (px)'),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Safety / quality',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: maxOutputCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Max output chars',
+                        suffixIcon: _HelpIcon(message: 'Sikkerhedsgrænse for output længde (truncates).'),
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: toneCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Tone (optional)',
+                        hintText: 'fx hype/rolig/tør humor',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: languageCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Language (optional)',
+                        hintText: 'fx da / en',
+                      ),
+                    ),
+                    SwitchListTile(
+                      value: noSwearing,
+                      onChanged: (v) => setInner(() => noSwearing = v),
+                      title: const Text('No swearing'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Session / context',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Refresh session',
+                          onPressed: () => refreshSession(setInner),
+                          icon: const Icon(Icons.refresh),
+                        ),
+                      ],
+                    ),
+                    SwitchListTile(
+                      value: sessionEnabled,
+                      onChanged: (v) => setInner(() => sessionEnabled = v),
+                      title: const Text('Enable session memory'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    TextField(
+                      controller: sessionMaxEntriesCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Max context entries',
+                        suffixIcon: _HelpIcon(message: 'Hvor mange tidligere entries der bruges som kontekst.'),
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                    const SizedBox(height: 8),
+                    if (session != null)
+                      Text(
+                        session!.isActive
+                            ? 'Active session: ${session!.sessionId ?? '-'} (entries: ${session!.contextEntries})'
+                            : 'No active session (entries: ${session!.contextEntries})',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.tonal(
+                            onPressed: sessionEnabled ? () => sessionStart(setInner) : null,
+                            child: const Text('Start session'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: sessionEnabled ? () => sessionStop(setInner) : null,
+                            child: const Text('Stop'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: sessionEnabled ? () => sessionReset(setInner) : null,
+                            child: const Text('Reset context'),
+                          ),
+                        ),
+                      ],
+                    ),
+
                     const SizedBox(height: 16),
                     const Divider(height: 1),
                     const SizedBox(height: 16),
@@ -702,6 +1206,48 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                         ],
                       ),
                     ],
+
+                    const SizedBox(height: 12),
+                    Text(
+                      'Overlay page URL (HTML)',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 6),
+                    if (overlayUrl == null || overlayUrl.isEmpty)
+                      Text(
+                        'Not available yet. Enable public and ensure PUBLIC_BASE_URL is set.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      )
+                    else ...[
+                      SelectableText(overlayUrl),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: () => _copy(overlayUrl),
+                        icon: const Icon(Icons.copy),
+                        label: const Text('Copy overlay URL'),
+                      ),
+                    ],
+
+                    const SizedBox(height: 12),
+                    Text(
+                      'Stream URL (SSE)',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 6),
+                    if (streamUrl == null || streamUrl.isEmpty)
+                      Text(
+                        'Not available yet. Enable public and ensure PUBLIC_BASE_URL is set.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      )
+                    else ...[
+                      SelectableText(streamUrl),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: () => _copy(streamUrl),
+                        icon: const Icon(Icons.copy),
+                        label: const Text('Copy stream URL'),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     Text(
                       'Twitch/HTML setup (GET URL)',
@@ -735,6 +1281,48 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Stats (last 7 days)',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Refresh stats',
+                          onPressed: () => refreshStats(setInner),
+                          icon: const Icon(Icons.refresh),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (stats == null)
+                      Text(
+                        'Loading…',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      )
+                    else if (stats!.days.isEmpty)
+                      Text(
+                        'No data yet.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      )
+                    else
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: stats!.days
+                            .map(
+                              (d) => Text(
+                                '${d.day}: ok=${d.processedCount}, dup=${d.duplicateCount}, cooldown=${d.cooldownCount}, err=${d.errorCount}, openai=${d.openaiErrorCount}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            )
+                            .toList(growable: false),
+                      ),
+
                     const SizedBox(height: 16),
                     const Divider(height: 1),
                     const SizedBox(height: 16),
@@ -777,6 +1365,75 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                       minLines: 2,
                       maxLines: 6,
                     ),
+
+                    const SizedBox(height: 12),
+                    Text(
+                      'Extra fields (optional)',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: testEventTypeCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'event_type',
+                        suffixIcon: _HelpIcon(message: 'Bliver til {{eventType}}.'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: testTierCtrl,
+                      decoration: const InputDecoration(labelText: 'tier'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: testMonthsCtrl,
+                      decoration: const InputDecoration(labelText: 'months'),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: testBitsCtrl,
+                      decoration: const InputDecoration(labelText: 'bits'),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: testAmountCtrl,
+                      decoration: const InputDecoration(labelText: 'amount'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: testRaidViewersCtrl,
+                      decoration: const InputDecoration(labelText: 'raid_viewers'),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: testChannelCtrl,
+                      decoration: const InputDecoration(labelText: 'channel'),
+                    ),
+
+                    const SizedBox(height: 12),
+                    FilledButton.tonal(
+                      onPressed: () => runPreview(setInner),
+                      child: const Text('Preview prompt (no OpenAI call)'),
+                    ),
+                    if (preview != null) ...[
+                      const SizedBox(height: 12),
+                      Text('Rendered prompt:', style: Theme.of(context).textTheme.titleSmall),
+                      const SizedBox(height: 6),
+                      SelectableText(preview!.renderedPrompt),
+                      const SizedBox(height: 10),
+                      Text('Effective prompt (incl. context):',
+                          style: Theme.of(context).textTheme.titleSmall),
+                      const SizedBox(height: 6),
+                      SelectableText(preview!.effectivePrompt),
+                    ],
+
                     const SizedBox(height: 12),
                     FilledButton(
                       onPressed: () => testFire(setInner),
@@ -844,6 +1501,11 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
       final cooldownMs = int.tryParse(cooldownCtrl.text.trim()) ?? 0;
       if (name.isEmpty || prompt.isEmpty) return;
 
+      final durationMs = parseIntOr(durationCtrl, 4500);
+      final fontSizePx = parseIntOr(fontSizeCtrl, 32);
+      final maxOutputChars = parseIntOr(maxOutputCtrl, 200);
+      final sessionMaxEntries = parseIntOr(sessionMaxEntriesCtrl, 10);
+
       setState(() {
         _busy = true;
         _error = null;
@@ -857,6 +1519,19 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
           prompt: prompt,
           isEnabled: enabled,
           cooldownMs: cooldownMs,
+
+          durationMs: durationMs,
+          textColor: textColorCtrl.text.trim().isEmpty ? 'white' : textColorCtrl.text.trim(),
+          fontFamily: fontFamilyCtrl.text.trim().isEmpty
+              ? 'system-ui, Segoe UI, Arial, sans-serif'
+              : fontFamilyCtrl.text.trim(),
+          fontSizePx: fontSizePx,
+          maxOutputChars: maxOutputChars,
+          tone: toneCtrl.text.trim(),
+          language: languageCtrl.text.trim(),
+          noSwearing: noSwearing,
+          sessionEnabled: sessionEnabled,
+          sessionMaxEntries: sessionMaxEntries,
         );
         await _load();
       } on ApiException catch (e) {
