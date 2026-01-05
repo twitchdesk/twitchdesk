@@ -34,12 +34,22 @@ class TwitchUser {
     required this.login,
     required this.displayName,
     required this.profileImageUrl,
+    required this.viewCount,
+    required this.broadcasterType,
+    required this.description,
+    required this.createdAt,
+    required this.offlineImageUrl,
   });
 
   final String id;
   final String login;
   final String displayName;
   final String profileImageUrl;
+  final int? viewCount;
+  final String? broadcasterType;
+  final String? description;
+  final String? createdAt;
+  final String? offlineImageUrl;
 
   factory TwitchUser.fromJson(Map<String, dynamic> json) {
     return TwitchUser(
@@ -47,6 +57,100 @@ class TwitchUser {
       login: (json['login'] as String?) ?? '',
       displayName: (json['display_name'] as String?) ?? '',
       profileImageUrl: (json['profile_image_url'] as String?) ?? '',
+      viewCount: (json['view_count'] as num?)?.toInt(),
+      broadcasterType: json['broadcaster_type'] as String?,
+      description: json['description'] as String?,
+      createdAt: json['created_at'] as String?,
+      offlineImageUrl: json['offline_image_url'] as String?,
+    );
+  }
+}
+
+class TwitchChannelInfo {
+  TwitchChannelInfo({
+    required this.broadcasterId,
+    required this.broadcasterLogin,
+    required this.broadcasterName,
+    required this.broadcasterLanguage,
+    required this.gameName,
+    required this.title,
+  });
+
+  final String broadcasterId;
+  final String broadcasterLogin;
+  final String broadcasterName;
+  final String? broadcasterLanguage;
+  final String? gameName;
+  final String? title;
+
+  factory TwitchChannelInfo.fromJson(Map<String, dynamic> json) {
+    return TwitchChannelInfo(
+      broadcasterId: (json['broadcaster_id'] as String?) ?? '',
+      broadcasterLogin: (json['broadcaster_login'] as String?) ?? '',
+      broadcasterName: (json['broadcaster_name'] as String?) ?? '',
+      broadcasterLanguage: json['broadcaster_language'] as String?,
+      gameName: json['game_name'] as String?,
+      title: json['title'] as String?,
+    );
+  }
+}
+
+class TwitchStreamInfo {
+  TwitchStreamInfo({
+    required this.id,
+    required this.userId,
+    required this.userLogin,
+    required this.userName,
+    required this.gameName,
+    required this.title,
+    required this.viewerCount,
+    required this.startedAt,
+    required this.streamType,
+  });
+
+  final String? id;
+  final String? userId;
+  final String userLogin;
+  final String? userName;
+  final String? gameName;
+  final String? title;
+  final int? viewerCount;
+  final String? startedAt;
+  final String streamType;
+
+  bool get isLive => streamType.isNotEmpty;
+
+  factory TwitchStreamInfo.fromJson(Map<String, dynamic> json) {
+    return TwitchStreamInfo(
+      id: json['id'] as String?,
+      userId: json['user_id'] as String?,
+      userLogin: (json['user_login'] as String?) ?? '',
+      userName: json['user_name'] as String?,
+      gameName: json['game_name'] as String?,
+      title: json['title'] as String?,
+      viewerCount: (json['viewer_count'] as num?)?.toInt(),
+      startedAt: json['started_at'] as String?,
+      streamType: (json['stream_type'] as String?) ?? (json['type'] as String?) ?? '',
+    );
+  }
+}
+
+class TwitchSummary {
+  TwitchSummary({required this.user, required this.stream, required this.channel});
+
+  final TwitchUser user;
+  final TwitchStreamInfo? stream;
+  final TwitchChannelInfo? channel;
+
+  factory TwitchSummary.fromJson(Map<String, dynamic> json) {
+    return TwitchSummary(
+      user: TwitchUser.fromJson((json['user'] as Map<String, dynamic>?) ?? const {}),
+      stream: (json['stream'] as Map<String, dynamic>?) == null
+          ? null
+          : TwitchStreamInfo.fromJson(json['stream'] as Map<String, dynamic>),
+      channel: (json['channel'] as Map<String, dynamic>?) == null
+          ? null
+          : TwitchChannelInfo.fromJson(json['channel'] as Map<String, dynamic>),
     );
   }
 }
@@ -497,6 +601,28 @@ class ApiClient {
         .whereType<Map<String, dynamic>>()
         .map(TwitchUser.fromJson)
         .toList(growable: false);
+  }
+
+  Future<TwitchSummary> twitchSummary({
+    required String accessToken,
+    required String login,
+  }) async {
+    final q = login.trim();
+    if (q.isEmpty) {
+      throw ApiException(400, 'missing login');
+    }
+
+    final uri = AppConfig.apiUri('/v1/twitch/summary').replace(queryParameters: {'login': q});
+    final resp = await _http.get(
+      uri,
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+    if (resp.statusCode != 200) {
+      throw ApiException(resp.statusCode, _bodyOrReason(resp));
+    }
+
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    return TwitchSummary.fromJson(json);
   }
 
   Future<void> patchMe({

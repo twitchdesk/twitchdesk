@@ -40,6 +40,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _twitchBusy = false;
   String? _twitchError;
   TwitchUser? _twitchUser;
+  TwitchStreamInfo? _twitchStream;
+  TwitchChannelInfo? _twitchChannelInfo;
   bool? _twitchIsLive;
 
   @override
@@ -77,6 +79,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _twitchBusy = false;
         _twitchError = null;
         _twitchUser = null;
+        _twitchStream = null;
+        _twitchChannelInfo = null;
         _twitchIsLive = null;
       });
       return;
@@ -86,33 +90,27 @@ class _HomeScreenState extends State<HomeScreen> {
       _twitchBusy = true;
       _twitchError = null;
       _twitchUser = null;
+      _twitchStream = null;
+      _twitchChannelInfo = null;
       _twitchIsLive = null;
     });
 
     try {
-      final users = await widget.api.twitchUsers(
+      final summary = await widget.api.twitchSummary(
         accessToken: widget.accessToken,
         login: login,
       );
-      final user = users.isNotEmpty ? users.first : null;
+      final user = summary.user;
+      final stream = summary.stream;
+      final channel = summary.channel;
 
-      bool? isLive;
-      try {
-        final statuses = await widget.api.channelStatus(accessToken: widget.accessToken);
-        final match = statuses.firstWhere(
-          (s) => s.login.toLowerCase() == login.toLowerCase(),
-          orElse: () => ChannelStatus(login: '', isLive: false),
-        );
-        if (match.login.isNotEmpty) {
-          isLive = match.isLive;
-        }
-      } catch (_) {
-        // Ignore status failures (often missing app credentials).
-      }
+      final isLive = stream?.isLive;
 
       if (!mounted) return;
       setState(() {
         _twitchUser = user;
+        _twitchStream = stream;
+        _twitchChannelInfo = channel;
         _twitchIsLive = isLive;
       });
     } on ApiException catch (e) {
@@ -192,6 +190,52 @@ class _HomeScreenState extends State<HomeScreen> {
                       ? _twitchUser!.displayName
                       : _twitchUser!.login,
                   style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              if ((_twitchIsLive ?? false) && (_twitchStream?.viewerCount ?? 0) > 0)
+                Text(
+                  'Viewers: ${_twitchStream!.viewerCount}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              if ((_twitchStream?.gameName ?? '').trim().isNotEmpty)
+                Text(
+                  'Game: ${_twitchStream!.gameName}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              if ((_twitchStream?.title ?? '').trim().isNotEmpty)
+                Text(
+                  _twitchStream!.title!,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              if ((_twitchChannelInfo?.title ?? '').trim().isNotEmpty && (_twitchStream?.title ?? '').trim().isEmpty)
+                Text(
+                  _twitchChannelInfo!.title!,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              if ((_twitchChannelInfo?.gameName ?? '').trim().isNotEmpty && (_twitchStream?.gameName ?? '').trim().isEmpty)
+                Text(
+                  'Game: ${_twitchChannelInfo!.gameName}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              if ((_twitchUser?.viewCount ?? 0) > 0)
+                Text(
+                  'Total views: ${_twitchUser!.viewCount}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              if ((_twitchUser?.createdAt ?? '').trim().isNotEmpty)
+                Text(
+                  'Created: ${_twitchUser!.createdAt}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              if ((_twitchUser?.description ?? '').trim().isNotEmpty)
+                Text(
+                  _twitchUser!.description!,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               if (_twitchIsLive != null)
                 Text(
