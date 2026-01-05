@@ -39,12 +39,12 @@ class _VariablesHint extends StatelessWidget {
       children: [
         const _HelpIcon(
           message:
-              'Du kan bruge variabler i prompten. De bliver udfyldt når alerten trigges. Nogle variabler kræver at dit tool sender de ekstra felter (event_type, tier, months, bits, amount, raid_viewers osv.).',
+              'Du kan bruge variabler i prompten. De bliver udfyldt når alerten trigges. Standard: {{eventId}}, {{username}}, {{message}} osv. Alle GET query params (undtagen token) kan også bruges direkte som {{paramNavn}}.',
         ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            'Variabler: {{eventId}}, {{username}}, {{message}}, {{eventType}}, {{tier}}, {{months}}, {{bits}}, {{amount}}, {{raidViewers}}, {{timestamp}}, {{channel}}.',
+            'Variabler: {{eventId}}, {{username}}, {{message}}, {{eventType}}, {{tier}}, {{months}}, {{bits}}, {{amount}}, {{raidViewers}}, {{timestamp}}, {{channel}} + alle query params som {{key}}.',
             style: style,
           ),
         ),
@@ -66,7 +66,7 @@ class _OverlayVariablesHint extends StatelessWidget {
           children: [
             const _HelpIcon(
               message:
-                  'GET URL\'en kan sættes ind i tools der kun kan åbne et link. Query params bliver til prompt-variabler.',
+                  'GET URL\'en kan sættes ind i tools der kun kan åbne et link. Endpointet returnerer altid ren tekst (ikke JSON). Alle query params (undtagen token) er tilgængelige som {{paramNavn}} i prompten.',
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -99,12 +99,26 @@ class _OverlayVariablesHint extends StatelessWidget {
           style: style,
         ),
         Text(
-          '- format=html: giver HTML output til overlay',
+          '- Du kan også sende egne felter (fx cheerAmount, badge, osv.) og bruge dem som {{cheerAmount}} i prompten.',
           style: style,
         ),
       ],
     );
   }
+}
+
+class _QueryParamRow {
+  _QueryParamRow({
+    required this.enabled,
+    required this.keyCtrl,
+    required this.placeholderCtrl,
+    required this.valueCtrl,
+  });
+
+  bool enabled;
+  final TextEditingController keyCtrl;
+  final TextEditingController placeholderCtrl;
+  final TextEditingController valueCtrl;
 }
 
 class _PromptHelpCard extends StatelessWidget {
@@ -693,58 +707,67 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
 
   String _twitchTemplateUrl(
     String rawPublicUrl, {
-    required bool includeAdvanced,
+    required Map<String, String> placeholdersByKey,
   }) {
     // Twitch tools typically support {var} placeholders. We must not URL-encode them.
-    final base = rawPublicUrl;
-    final qp = <String, String>{
-      'event_id': '{event_id}',
-      'viewer': '{username}',
-      'message': '{message}',
-      'format': 'html',
-    };
-    if (includeAdvanced) {
-      qp.addAll({
-        'event_type': '{event_type}',
-        'tier': '{tier}',
-        'months': '{months}',
-        'bits': '{bits}',
-        'amount': '{amount}',
-        'raid_viewers': '{raid_viewers}',
-        'channel': '{channel}',
-      });
+    final qp = <String, String>{};
+    for (final e in placeholdersByKey.entries) {
+      final key = e.key.trim();
+      final placeholder = e.value.trim();
+      if (key.isEmpty || placeholder.isEmpty) continue;
+      qp[key] = '{$placeholder}';
     }
-    return _buildUrlWithRawPlaceholders(base, params: qp, encodeValues: false);
+    return _buildUrlWithRawPlaceholders(rawPublicUrl, params: qp, encodeValues: false);
+  }
+
+  Widget _buildParamPickerRow(
+    BuildContext context, {
+    required String label,
+    required bool enabled,
+    required ValueChanged<bool>? onEnabledChanged,
+    required TextEditingController placeholderCtrl,
+    required VoidCallback onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Checkbox(
+            value: enabled,
+            onChanged: onEnabledChanged == null ? null : (v) => onEnabledChanged(v ?? false),
+          ),
+          Expanded(
+            child: Text(label),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 220,
+            child: TextField(
+              controller: placeholderCtrl,
+              onChanged: (_) => onChanged(),
+              decoration: const InputDecoration(
+                labelText: 'placeholder',
+                isDense: true,
+                prefixText: '{',
+                suffixText: '}',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   String _testUrl(
     String rawPublicUrl, {
-    required String eventId,
-    String? viewer,
-    String? message,
-    String? eventType,
-    String? tier,
-    String? months,
-    String? bits,
-    String? amount,
-    String? raidViewers,
-    String? channel,
-    required bool includeAdvanced,
+    required Map<String, String> valuesByKey,
   }) {
-    final qp = <String, String>{
-      'event_id': eventId,
-      if (viewer != null && viewer.trim().isNotEmpty) 'viewer': viewer.trim(),
-      if (message != null && message.trim().isNotEmpty) 'message': message.trim(),
-      'format': 'html',
-    };
-    if (includeAdvanced) {
-      if (eventType != null && eventType.trim().isNotEmpty) qp['event_type'] = eventType.trim();
-      if (tier != null && tier.trim().isNotEmpty) qp['tier'] = tier.trim();
-      if (months != null && months.trim().isNotEmpty) qp['months'] = months.trim();
-      if (bits != null && bits.trim().isNotEmpty) qp['bits'] = bits.trim();
-      if (amount != null && amount.trim().isNotEmpty) qp['amount'] = amount.trim();
-      if (raidViewers != null && raidViewers.trim().isNotEmpty) qp['raid_viewers'] = raidViewers.trim();
-      if (channel != null && channel.trim().isNotEmpty) qp['channel'] = channel.trim();
+    final qp = <String, String>{};
+    for (final e in valuesByKey.entries) {
+      final key = e.key.trim();
+      final value = e.value.trim();
+      if (key.isEmpty || value.isEmpty) continue;
+      qp[key] = value;
     }
     return _buildUrlWithRawPlaceholders(rawPublicUrl, params: qp, encodeValues: true);
   }
@@ -809,6 +832,19 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
     final testAmountCtrl = TextEditingController(text: '');
     final testRaidViewersCtrl = TextEditingController(text: '');
     final testChannelCtrl = TextEditingController(text: '');
+    final testTimestampCtrl = TextEditingController(text: '');
+
+    final phEventIdCtrl = TextEditingController(text: 'event_id');
+    final phViewerCtrl = TextEditingController(text: 'username');
+    final phMessageCtrl = TextEditingController(text: 'message');
+    final phEventTypeCtrl = TextEditingController(text: 'event_type');
+    final phTierCtrl = TextEditingController(text: 'tier');
+    final phMonthsCtrl = TextEditingController(text: 'months');
+    final phBitsCtrl = TextEditingController(text: 'bits');
+    final phAmountCtrl = TextEditingController(text: 'amount');
+    final phRaidViewersCtrl = TextEditingController(text: 'raid_viewers');
+    final phChannelCtrl = TextEditingController(text: 'channel');
+    final phTimestampCtrl = TextEditingController(text: 'timestamp');
 
     // Restore cached test fields for this alert (in-app only).
     final cached = _testFieldCache[item.id];
@@ -833,10 +869,76 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
       if (vRaid != null) testRaidViewersCtrl.text = vRaid;
       final vChannel = cached['channel'];
       if (vChannel != null) testChannelCtrl.text = vChannel;
+
+      final vTimestamp = cached['timestamp'];
+      if (vTimestamp != null) testTimestampCtrl.text = vTimestamp;
+
+      final vPhEventId = cached['ph_event_id'];
+      if (vPhEventId != null) phEventIdCtrl.text = vPhEventId;
+      final vPhViewer = cached['ph_viewer'];
+      if (vPhViewer != null) phViewerCtrl.text = vPhViewer;
+      final vPhMsg = cached['ph_message'];
+      if (vPhMsg != null) phMessageCtrl.text = vPhMsg;
+      final vPhEventType = cached['ph_event_type'];
+      if (vPhEventType != null) phEventTypeCtrl.text = vPhEventType;
+      final vPhTier = cached['ph_tier'];
+      if (vPhTier != null) phTierCtrl.text = vPhTier;
+      final vPhMonths = cached['ph_months'];
+      if (vPhMonths != null) phMonthsCtrl.text = vPhMonths;
+      final vPhBits = cached['ph_bits'];
+      if (vPhBits != null) phBitsCtrl.text = vPhBits;
+      final vPhAmount = cached['ph_amount'];
+      if (vPhAmount != null) phAmountCtrl.text = vPhAmount;
+      final vPhRaid = cached['ph_raid_viewers'];
+      if (vPhRaid != null) phRaidViewersCtrl.text = vPhRaid;
+      final vPhChannel = cached['ph_channel'];
+      if (vPhChannel != null) phChannelCtrl.text = vPhChannel;
+      final vPhTimestamp = cached['ph_timestamp'];
+      if (vPhTimestamp != null) phTimestampCtrl.text = vPhTimestamp;
+    }
+
+    final selectedParams = <String, bool>{
+      'event_id': true,
+      'viewer': true,
+      'message': true,
+      'event_type': false,
+      'tier': false,
+      'months': false,
+      'bits': false,
+      'amount': false,
+      'raid_viewers': false,
+      'channel': false,
+      'timestamp': false,
+    };
+    if (cached != null) {
+      for (final k in selectedParams.keys) {
+        final v = cached['sel_$k'];
+        if (v == '1') selectedParams[k] = true;
+        if (v == '0') selectedParams[k] = false;
+      }
+    }
+
+    final customParams = <_QueryParamRow>[];
+    if (cached != null) {
+      final n = int.tryParse(cached['custom_count'] ?? '') ?? 0;
+      for (var i = 0; i < n; i++) {
+        final key = cached['custom_${i}_key'] ?? '';
+        final ph = cached['custom_${i}_ph'] ?? '';
+        final val = cached['custom_${i}_val'] ?? '';
+        final sel = cached['custom_${i}_sel'] ?? '1';
+        customParams.add(
+          _QueryParamRow(
+            enabled: sel != '0',
+            keyCtrl: TextEditingController(text: key),
+            placeholderCtrl: TextEditingController(text: ph),
+            valueCtrl: TextEditingController(text: val),
+          ),
+        );
+      }
     }
 
     void cacheTestFields() {
-      _testFieldCache[item.id] = {
+      final out = <String, String>{
         'event_id': testEventIdCtrl.text,
         'viewer': testUsernameCtrl.text,
         'message': testMessageCtrl.text,
@@ -847,7 +949,35 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
         'amount': testAmountCtrl.text,
         'raid_viewers': testRaidViewersCtrl.text,
         'channel': testChannelCtrl.text,
+        'timestamp': testTimestampCtrl.text,
+
+        'ph_event_id': phEventIdCtrl.text,
+        'ph_viewer': phViewerCtrl.text,
+        'ph_message': phMessageCtrl.text,
+        'ph_event_type': phEventTypeCtrl.text,
+        'ph_tier': phTierCtrl.text,
+        'ph_months': phMonthsCtrl.text,
+        'ph_bits': phBitsCtrl.text,
+        'ph_amount': phAmountCtrl.text,
+        'ph_raid_viewers': phRaidViewersCtrl.text,
+        'ph_channel': phChannelCtrl.text,
+        'ph_timestamp': phTimestampCtrl.text,
       };
+
+      for (final e in selectedParams.entries) {
+        out['sel_${e.key}'] = e.value ? '1' : '0';
+      }
+
+      out['custom_count'] = customParams.length.toString();
+      for (var i = 0; i < customParams.length; i++) {
+        final p = customParams[i];
+        out['custom_${i}_key'] = p.keyCtrl.text;
+        out['custom_${i}_ph'] = p.placeholderCtrl.text;
+        out['custom_${i}_val'] = p.valueCtrl.text;
+        out['custom_${i}_sel'] = p.enabled ? '1' : '0';
+      }
+
+      _testFieldCache[item.id] = out;
     }
 
     void attachCacheListeners() {
@@ -861,6 +991,25 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
       testAmountCtrl.addListener(cacheTestFields);
       testRaidViewersCtrl.addListener(cacheTestFields);
       testChannelCtrl.addListener(cacheTestFields);
+      testTimestampCtrl.addListener(cacheTestFields);
+
+      phEventIdCtrl.addListener(cacheTestFields);
+      phViewerCtrl.addListener(cacheTestFields);
+      phMessageCtrl.addListener(cacheTestFields);
+      phEventTypeCtrl.addListener(cacheTestFields);
+      phTierCtrl.addListener(cacheTestFields);
+      phMonthsCtrl.addListener(cacheTestFields);
+      phBitsCtrl.addListener(cacheTestFields);
+      phAmountCtrl.addListener(cacheTestFields);
+      phRaidViewersCtrl.addListener(cacheTestFields);
+      phChannelCtrl.addListener(cacheTestFields);
+      phTimestampCtrl.addListener(cacheTestFields);
+
+      for (final p in customParams) {
+        p.keyCtrl.addListener(cacheTestFields);
+        p.placeholderCtrl.addListener(cacheTestFields);
+        p.valueCtrl.addListener(cacheTestFields);
+      }
     }
 
     attachCacheListeners();
@@ -872,7 +1021,16 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
     AiAlertStatsResponse? stats;
     String? localError;
 
-    var includeAdvancedUrlFields = false;
+    var includeAdvancedUrlFields = <String>[
+      'event_type',
+      'tier',
+      'months',
+      'bits',
+      'amount',
+      'raid_viewers',
+      'channel',
+      'timestamp',
+    ].any((k) => selectedParams[k] == true);
     var saving = false;
 
     int parseIntOr(TextEditingController c, int fallback) {
@@ -1241,27 +1399,131 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
 
           final rawForCopy = _withUsername(currentPub.publicUrl);
 
+          // If the user toggles “include advanced”, auto-select/unselect those keys.
+          void applyAdvancedToggle(bool enabled) {
+            const advancedKeys = <String>[
+              'event_type',
+              'tier',
+              'months',
+              'bits',
+              'amount',
+              'raid_viewers',
+              'channel',
+              'timestamp',
+            ];
+            for (final k in advancedKeys) {
+              selectedParams[k] = enabled;
+            }
+          }
+
+          Map<String, String> buildPlaceholdersByKey() {
+            String ph(TextEditingController c, String fallback) {
+              final t = c.text.trim();
+              return t.isEmpty ? fallback : t;
+            }
+
+            final out = <String, String>{};
+            // event_id is required; always include.
+            out['event_id'] = ph(phEventIdCtrl, 'event_id');
+
+            if (selectedParams['viewer'] == true) out['viewer'] = ph(phViewerCtrl, 'username');
+            if (selectedParams['message'] == true) out['message'] = ph(phMessageCtrl, 'message');
+            if (selectedParams['event_type'] == true) out['event_type'] = ph(phEventTypeCtrl, 'event_type');
+            if (selectedParams['tier'] == true) out['tier'] = ph(phTierCtrl, 'tier');
+            if (selectedParams['months'] == true) out['months'] = ph(phMonthsCtrl, 'months');
+            if (selectedParams['bits'] == true) out['bits'] = ph(phBitsCtrl, 'bits');
+            if (selectedParams['amount'] == true) out['amount'] = ph(phAmountCtrl, 'amount');
+            if (selectedParams['raid_viewers'] == true) {
+              out['raid_viewers'] = ph(phRaidViewersCtrl, 'raid_viewers');
+            }
+            if (selectedParams['channel'] == true) out['channel'] = ph(phChannelCtrl, 'channel');
+            if (selectedParams['timestamp'] == true) out['timestamp'] = ph(phTimestampCtrl, 'timestamp');
+
+            for (final p in customParams) {
+              if (!p.enabled) continue;
+              final k = p.keyCtrl.text.trim();
+              final v = p.placeholderCtrl.text.trim();
+              if (k.isEmpty || v.isEmpty) continue;
+              out[k] = v;
+            }
+            return out;
+          }
+
+          Map<String, String> buildValuesByKey() {
+            String val(TextEditingController c, {String? fallback}) {
+              final t = c.text.trim();
+              return t.isEmpty ? (fallback ?? '') : t;
+            }
+
+            final out = <String, String>{};
+            out['event_id'] = val(
+              testEventIdCtrl,
+              fallback: 'test-${DateTime.now().millisecondsSinceEpoch}',
+            );
+
+            if (selectedParams['viewer'] == true) {
+              final v = testUsernameCtrl.text.trim();
+              if (v.isNotEmpty) out['viewer'] = v;
+            }
+            if (selectedParams['message'] == true) {
+              final v = testMessageCtrl.text.trim();
+              if (v.isNotEmpty) out['message'] = v;
+            }
+            if (selectedParams['event_type'] == true) {
+              final v = testEventTypeCtrl.text.trim();
+              if (v.isNotEmpty) out['event_type'] = v;
+            }
+            if (selectedParams['tier'] == true) {
+              final v = testTierCtrl.text.trim();
+              if (v.isNotEmpty) out['tier'] = v;
+            }
+            if (selectedParams['months'] == true) {
+              final v = testMonthsCtrl.text.trim();
+              if (v.isNotEmpty) out['months'] = v;
+            }
+            if (selectedParams['bits'] == true) {
+              final v = testBitsCtrl.text.trim();
+              if (v.isNotEmpty) out['bits'] = v;
+            }
+            if (selectedParams['amount'] == true) {
+              final v = testAmountCtrl.text.trim();
+              if (v.isNotEmpty) out['amount'] = v;
+            }
+            if (selectedParams['raid_viewers'] == true) {
+              final v = testRaidViewersCtrl.text.trim();
+              if (v.isNotEmpty) out['raid_viewers'] = v;
+            }
+            if (selectedParams['channel'] == true) {
+              final v = testChannelCtrl.text.trim();
+              if (v.isNotEmpty) out['channel'] = v;
+            }
+            if (selectedParams['timestamp'] == true) {
+              final v = testTimestampCtrl.text.trim();
+              if (v.isNotEmpty) out['timestamp'] = v;
+            }
+
+            for (final p in customParams) {
+              if (!p.enabled) continue;
+              final k = p.keyCtrl.text.trim();
+              final v = p.valueCtrl.text.trim();
+              if (k.isEmpty || v.isEmpty) continue;
+              out[k] = v;
+            }
+            return out;
+          }
+
           final twitchTemplateUrl = (rawForCopy == null || rawForCopy.isEmpty)
               ? null
-              : _twitchTemplateUrl(rawForCopy, includeAdvanced: includeAdvancedUrlFields);
+              : _twitchTemplateUrl(
+                  rawForCopy,
+                  placeholdersByKey: buildPlaceholdersByKey(),
+                );
 
           final testUrl = (rawForCopy == null || rawForCopy.isEmpty)
               ? null
               : _testUrl(
                   rawForCopy,
-                  eventId: testEventIdCtrl.text.trim().isEmpty
-                      ? 'test-${DateTime.now().millisecondsSinceEpoch}'
-                      : testEventIdCtrl.text.trim(),
-                  viewer: testUsernameCtrl.text,
-                  message: testMessageCtrl.text,
-                  eventType: testEventTypeCtrl.text,
-                  tier: testTierCtrl.text,
-                  months: testMonthsCtrl.text,
-                  bits: testBitsCtrl.text,
-                  amount: testAmountCtrl.text,
-                  raidViewers: testRaidViewersCtrl.text,
-                  channel: testChannelCtrl.text,
-                  includeAdvanced: includeAdvancedUrlFields,
+                  valuesByKey: buildValuesByKey(),
                 );
 
           // Lazy-load session/stats once the dialog is visible.
@@ -1669,7 +1931,7 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Twitch bruger typisk {variable}. Brug URL\'en herunder som copy/paste (den er ikke URL-encoded). Sæt de variabler dit tool understøtter. event_id skal være unik pr event.',
+                      'Denne URL kan indsættes i Twitch/HTML tools der kun kan lave et GET kald. Den returnerer altid ren tekst. Du vælger selv hvilke query params der skal med, og hvilke {variable}-navne dit tool bruger.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 8),
@@ -1677,10 +1939,243 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     const SizedBox(height: 8),
                     SwitchListTile(
                       value: includeAdvancedUrlFields,
-                      onChanged: (v) => setInner(() => includeAdvancedUrlFields = v),
+                      onChanged: (v) => setInner(() {
+                        includeAdvancedUrlFields = v;
+                        applyAdvancedToggle(v);
+                        cacheTestFields();
+                      }),
                       title: const Text('Include advanced fields (tier/bits/months/...)'),
                       contentPadding: EdgeInsets.zero,
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Vælg query params og {placeholder}-navne',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildParamPickerRow(
+                      context,
+                      label: 'event_id (required)',
+                      enabled: true,
+                      onEnabledChanged: null,
+                      placeholderCtrl: phEventIdCtrl,
+                      onChanged: () => setInner(() {}),
+                    ),
+                    _buildParamPickerRow(
+                      context,
+                      label: 'viewer',
+                      enabled: selectedParams['viewer'] == true,
+                      onEnabledChanged: (v) => setInner(() {
+                        selectedParams['viewer'] = v;
+                        cacheTestFields();
+                      }),
+                      placeholderCtrl: phViewerCtrl,
+                      onChanged: () => setInner(() {}),
+                    ),
+                    _buildParamPickerRow(
+                      context,
+                      label: 'message',
+                      enabled: selectedParams['message'] == true,
+                      onEnabledChanged: (v) => setInner(() {
+                        selectedParams['message'] = v;
+                        cacheTestFields();
+                      }),
+                      placeholderCtrl: phMessageCtrl,
+                      onChanged: () => setInner(() {}),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Advanced (valgfri)',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildParamPickerRow(
+                      context,
+                      label: 'event_type',
+                      enabled: selectedParams['event_type'] == true,
+                      onEnabledChanged: (v) => setInner(() {
+                        selectedParams['event_type'] = v;
+                        cacheTestFields();
+                      }),
+                      placeholderCtrl: phEventTypeCtrl,
+                      onChanged: () => setInner(() {}),
+                    ),
+                    _buildParamPickerRow(
+                      context,
+                      label: 'tier',
+                      enabled: selectedParams['tier'] == true,
+                      onEnabledChanged: (v) => setInner(() {
+                        selectedParams['tier'] = v;
+                        cacheTestFields();
+                      }),
+                      placeholderCtrl: phTierCtrl,
+                      onChanged: () => setInner(() {}),
+                    ),
+                    _buildParamPickerRow(
+                      context,
+                      label: 'months',
+                      enabled: selectedParams['months'] == true,
+                      onEnabledChanged: (v) => setInner(() {
+                        selectedParams['months'] = v;
+                        cacheTestFields();
+                      }),
+                      placeholderCtrl: phMonthsCtrl,
+                      onChanged: () => setInner(() {}),
+                    ),
+                    _buildParamPickerRow(
+                      context,
+                      label: 'bits',
+                      enabled: selectedParams['bits'] == true,
+                      onEnabledChanged: (v) => setInner(() {
+                        selectedParams['bits'] = v;
+                        cacheTestFields();
+                      }),
+                      placeholderCtrl: phBitsCtrl,
+                      onChanged: () => setInner(() {}),
+                    ),
+                    _buildParamPickerRow(
+                      context,
+                      label: 'amount',
+                      enabled: selectedParams['amount'] == true,
+                      onEnabledChanged: (v) => setInner(() {
+                        selectedParams['amount'] = v;
+                        cacheTestFields();
+                      }),
+                      placeholderCtrl: phAmountCtrl,
+                      onChanged: () => setInner(() {}),
+                    ),
+                    _buildParamPickerRow(
+                      context,
+                      label: 'raid_viewers',
+                      enabled: selectedParams['raid_viewers'] == true,
+                      onEnabledChanged: (v) => setInner(() {
+                        selectedParams['raid_viewers'] = v;
+                        cacheTestFields();
+                      }),
+                      placeholderCtrl: phRaidViewersCtrl,
+                      onChanged: () => setInner(() {}),
+                    ),
+                    _buildParamPickerRow(
+                      context,
+                      label: 'channel',
+                      enabled: selectedParams['channel'] == true,
+                      onEnabledChanged: (v) => setInner(() {
+                        selectedParams['channel'] = v;
+                        cacheTestFields();
+                      }),
+                      placeholderCtrl: phChannelCtrl,
+                      onChanged: () => setInner(() {}),
+                    ),
+                    _buildParamPickerRow(
+                      context,
+                      label: 'timestamp',
+                      enabled: selectedParams['timestamp'] == true,
+                      onEnabledChanged: (v) => setInner(() {
+                        selectedParams['timestamp'] = v;
+                        cacheTestFields();
+                      }),
+                      placeholderCtrl: phTimestampCtrl,
+                      onChanged: () => setInner(() {}),
+                    ),
+
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Custom query params',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            final p = _QueryParamRow(
+                              enabled: true,
+                              keyCtrl: TextEditingController(),
+                              placeholderCtrl: TextEditingController(),
+                              valueCtrl: TextEditingController(),
+                            );
+                            p.keyCtrl.addListener(cacheTestFields);
+                            p.placeholderCtrl.addListener(cacheTestFields);
+                            p.valueCtrl.addListener(cacheTestFields);
+                            setInner(() {
+                              customParams.add(p);
+                              cacheTestFields();
+                            });
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add'),
+                        ),
+                      ],
+                    ),
+                    if (customParams.isEmpty)
+                      Text(
+                        'Brug hvis dit tool sender andre felter end standard (fx cheerAmount/badge/etc). Nøglen bliver til {{key}} i prompten.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      )
+                    else
+                      Column(
+                        children: customParams.asMap().entries.map((entry) {
+                          final idx = entry.key;
+                          final p = entry.value;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: [
+                                Checkbox(
+                                  value: p.enabled,
+                                  onChanged: (v) => setInner(() {
+                                    p.enabled = v ?? false;
+                                    cacheTestFields();
+                                  }),
+                                ),
+                                Expanded(
+                                  child: TextField(
+                                    decoration: const InputDecoration(
+                                      labelText: 'key',
+                                      isDense: true,
+                                    ),
+                                    controller: p.keyCtrl,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                SizedBox(
+                                  width: 180,
+                                  child: TextField(
+                                    controller: p.placeholderCtrl,
+                                    decoration: const InputDecoration(
+                                      labelText: 'placeholder',
+                                      isDense: true,
+                                      prefixText: '{',
+                                      suffixText: '}',
+                                    ),
+                                    onChanged: (_) => setInner(() {}),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                SizedBox(
+                                  width: 220,
+                                  child: TextField(
+                                    controller: p.valueCtrl,
+                                    decoration: const InputDecoration(
+                                      labelText: 'test value',
+                                      isDense: true,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Remove',
+                                  onPressed: () => setInner(() {
+                                    customParams.removeAt(idx);
+                                    cacheTestFields();
+                                  }),
+                                  icon: const Icon(Icons.delete_outline),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(growable: false),
+                      ),
                     if (twitchTemplateUrl != null) ...[
                       SelectableText(twitchTemplateUrl),
                       const SizedBox(height: 8),
@@ -1850,6 +2345,15 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     TextField(
                       controller: testChannelCtrl,
                       decoration: const InputDecoration(labelText: 'channel'),
+                    ),
+
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: testTimestampCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'timestamp (optional)',
+                        hintText: 'ISO string / epoch / whatever your tool provides',
+                      ),
                     ),
 
                     const SizedBox(height: 12),
