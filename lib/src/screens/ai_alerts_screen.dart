@@ -225,6 +225,9 @@ class AiAlertsScreen extends StatefulWidget {
 class _AiAlertsScreenState extends State<AiAlertsScreen> {
   final _tokenCtrl = TextEditingController();
 
+  // Remembers per-alert test inputs during the current app session.
+  final Map<String, Map<String, String>> _testFieldCache = {};
+
   bool _busy = true;
   String? _error;
 
@@ -667,24 +670,83 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
     return url.replaceAll('{username}', Uri.encodeComponent(u));
   }
 
-  String _overlayUrlTemplate(String rawPublicUrl) {
-    // rawPublicUrl already contains ?token=...
-    final base = Uri.parse(rawPublicUrl);
+  String _buildUrlWithRawPlaceholders(
+    String baseUrl, {
+    required Map<String, String> params,
+    bool encodeValues = true,
+  }) {
+    final uri = Uri.parse(baseUrl);
+    final merged = <String, String>{...uri.queryParameters, ...params};
+
+    String encodeValue(String v) {
+      if (!encodeValues) return v;
+      return Uri.encodeQueryComponent(v);
+    }
+
+    final query = merged.entries
+        .map((e) => '${Uri.encodeQueryComponent(e.key)}=${encodeValue(e.value)}')
+        .join('&');
+
+    final base = uri.replace(query: '').toString();
+    return '$base?$query';
+  }
+
+  String _twitchTemplateUrl(
+    String rawPublicUrl, {
+    required bool includeAdvanced,
+  }) {
+    // Twitch tools typically support {var} placeholders. We must not URL-encode them.
+    final base = rawPublicUrl;
     final qp = <String, String>{
-      ...base.queryParameters,
-      'event_id': '<event_id>',
-      'viewer': '<viewer>',
-      'message': '<message>',
-      'event_type': '<event_type>',
-      'tier': '<tier>',
-      'months': '<months>',
-      'bits': '<bits>',
-      'amount': '<amount>',
-      'raid_viewers': '<raid_viewers>',
-      'channel': '<channel>',
+      'event_id': '{event_id}',
+      'viewer': '{username}',
+      'message': '{message}',
       'format': 'html',
     };
-    return base.replace(queryParameters: qp).toString();
+    if (includeAdvanced) {
+      qp.addAll({
+        'event_type': '{event_type}',
+        'tier': '{tier}',
+        'months': '{months}',
+        'bits': '{bits}',
+        'amount': '{amount}',
+        'raid_viewers': '{raid_viewers}',
+        'channel': '{channel}',
+      });
+    }
+    return _buildUrlWithRawPlaceholders(base, params: qp, encodeValues: false);
+  }
+
+  String _testUrl(
+    String rawPublicUrl, {
+    required String eventId,
+    String? viewer,
+    String? message,
+    String? eventType,
+    String? tier,
+    String? months,
+    String? bits,
+    String? amount,
+    String? raidViewers,
+    String? channel,
+    required bool includeAdvanced,
+  }) {
+    final qp = <String, String>{
+      'event_id': eventId,
+      if (viewer != null && viewer.trim().isNotEmpty) 'viewer': viewer.trim(),
+      if (message != null && message.trim().isNotEmpty) 'message': message.trim(),
+      'format': 'html',
+    };
+    if (includeAdvanced) {
+      if (eventType != null && eventType.trim().isNotEmpty) qp['event_type'] = eventType.trim();
+      if (tier != null && tier.trim().isNotEmpty) qp['tier'] = tier.trim();
+      if (months != null && months.trim().isNotEmpty) qp['months'] = months.trim();
+      if (bits != null && bits.trim().isNotEmpty) qp['bits'] = bits.trim();
+      if (amount != null && amount.trim().isNotEmpty) qp['amount'] = amount.trim();
+      if (raidViewers != null && raidViewers.trim().isNotEmpty) qp['raid_viewers'] = raidViewers.trim();
+      if (channel != null && channel.trim().isNotEmpty) qp['channel'] = channel.trim();
+    }
+    return _buildUrlWithRawPlaceholders(rawPublicUrl, params: qp, encodeValues: true);
   }
 
   Future<void> _openAlertEditor(AiAlertListItem item) async {
@@ -712,6 +774,8 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
     }
 
     if (!mounted || detail == null || pub == null) return;
+
+    AiAlertDetailResponse currentDetail = detail;
 
     final nameCtrl = TextEditingController(text: detail.name);
     final promptCtrl = TextEditingController(text: detail.prompt);
@@ -746,12 +810,70 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
     final testRaidViewersCtrl = TextEditingController(text: '');
     final testChannelCtrl = TextEditingController(text: '');
 
+    // Restore cached test fields for this alert (in-app only).
+    final cached = _testFieldCache[item.id];
+    if (cached != null) {
+      final vEventId = cached['event_id'];
+      if (vEventId != null) testEventIdCtrl.text = vEventId;
+      final vViewer = cached['viewer'];
+      if (vViewer != null) testUsernameCtrl.text = vViewer;
+      final vMsg = cached['message'];
+      if (vMsg != null) testMessageCtrl.text = vMsg;
+      final vEventType = cached['event_type'];
+      if (vEventType != null) testEventTypeCtrl.text = vEventType;
+      final vTier = cached['tier'];
+      if (vTier != null) testTierCtrl.text = vTier;
+      final vMonths = cached['months'];
+      if (vMonths != null) testMonthsCtrl.text = vMonths;
+      final vBits = cached['bits'];
+      if (vBits != null) testBitsCtrl.text = vBits;
+      final vAmount = cached['amount'];
+      if (vAmount != null) testAmountCtrl.text = vAmount;
+      final vRaid = cached['raid_viewers'];
+      if (vRaid != null) testRaidViewersCtrl.text = vRaid;
+      final vChannel = cached['channel'];
+      if (vChannel != null) testChannelCtrl.text = vChannel;
+    }
+
+    void cacheTestFields() {
+      _testFieldCache[item.id] = {
+        'event_id': testEventIdCtrl.text,
+        'viewer': testUsernameCtrl.text,
+        'message': testMessageCtrl.text,
+        'event_type': testEventTypeCtrl.text,
+        'tier': testTierCtrl.text,
+        'months': testMonthsCtrl.text,
+        'bits': testBitsCtrl.text,
+        'amount': testAmountCtrl.text,
+        'raid_viewers': testRaidViewersCtrl.text,
+        'channel': testChannelCtrl.text,
+      };
+    }
+
+    void attachCacheListeners() {
+      testEventIdCtrl.addListener(cacheTestFields);
+      testUsernameCtrl.addListener(cacheTestFields);
+      testMessageCtrl.addListener(cacheTestFields);
+      testEventTypeCtrl.addListener(cacheTestFields);
+      testTierCtrl.addListener(cacheTestFields);
+      testMonthsCtrl.addListener(cacheTestFields);
+      testBitsCtrl.addListener(cacheTestFields);
+      testAmountCtrl.addListener(cacheTestFields);
+      testRaidViewersCtrl.addListener(cacheTestFields);
+      testChannelCtrl.addListener(cacheTestFields);
+    }
+
+    attachCacheListeners();
+
     AiAlertPublicStatusResponse currentPub = pub;
     AiAlertFireResponse? lastFire;
     AiAlertPreviewResponse? preview;
     AiAlertSessionResponse? session;
     AiAlertStatsResponse? stats;
     String? localError;
+
+    var includeAdvancedUrlFields = false;
+    var saving = false;
 
     int parseIntOr(TextEditingController c, int fallback) {
       final v = int.tryParse(c.text.trim());
@@ -1009,17 +1131,138 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
       }
     }
 
+    Future<bool> saveInDialog(StateSetter setInner) async {
+      if (saving) return false;
+
+      setInner(() {
+        saving = true;
+        localError = null;
+      });
+
+      final name = nameCtrl.text.trim();
+      final prompt = promptCtrl.text.trim();
+      final cooldownMs = int.tryParse(cooldownCtrl.text.trim()) ?? 0;
+      final durationMs = parseIntOr(durationCtrl, 4500);
+      final fontSizePx = parseIntOr(fontSizeCtrl, 32);
+      final maxOutputChars = parseIntOr(maxOutputCtrl, 200);
+      final sessionMaxEntries = parseIntOr(sessionMaxEntriesCtrl, 10);
+
+      try {
+        await widget.api.aiAlertsUpdate(
+          accessToken: widget.accessToken,
+          alertId: item.id,
+          name: name,
+          prompt: prompt,
+          isEnabled: enabled,
+          cooldownMs: cooldownMs,
+          durationMs: durationMs,
+          textColor: textColorCtrl.text.trim().isEmpty ? 'white' : textColorCtrl.text.trim(),
+          fontFamily: fontFamilyCtrl.text.trim().isEmpty
+              ? 'system-ui, Segoe UI, Arial, sans-serif'
+              : fontFamilyCtrl.text.trim(),
+          fontSizePx: fontSizePx,
+          maxOutputChars: maxOutputChars,
+          tone: toneCtrl.text.trim(),
+          language: languageCtrl.text.trim(),
+          noSwearing: noSwearing,
+          sessionEnabled: sessionEnabled,
+          sessionMaxEntries: sessionMaxEntries,
+        );
+
+        final updated = await widget.api.aiAlertsGet(
+          accessToken: widget.accessToken,
+          alertId: item.id,
+        );
+
+        // Update currentDetail and show if server adjusted values.
+        currentDetail = updated;
+        final adjustments = <String>[];
+        void checkNum(String label, int wanted, int got) {
+          if (wanted != got) adjustments.add('$label $wanted → $got');
+        }
+
+        void checkBool(String label, bool wanted, bool got) {
+          if (wanted != got) adjustments.add('$label $wanted → $got');
+        }
+
+        checkNum('cooldown_ms', cooldownMs, updated.cooldownMs);
+        checkNum('duration_ms', durationMs, updated.durationMs);
+        checkNum('font_size_px', fontSizePx, updated.fontSizePx);
+        checkNum('max_output_chars', maxOutputChars, updated.maxOutputChars);
+        checkBool('session_enabled', sessionEnabled, updated.sessionEnabled);
+        if (sessionEnabled) {
+          checkNum('session_max_entries', sessionMaxEntries, updated.sessionMaxEntries);
+        }
+        checkBool('no_swearing', noSwearing, updated.noSwearing);
+        checkBool('is_enabled', enabled, updated.isEnabled);
+
+        if (adjustments.isNotEmpty && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Server adjusted: ${adjustments.join(', ')}')),
+          );
+        }
+
+        setInner(() {
+          // Sync any clamped values back to the UI.
+          cooldownCtrl.text = updated.cooldownMs.toString();
+          durationCtrl.text = updated.durationMs.toString();
+          fontSizeCtrl.text = updated.fontSizePx.toString();
+          maxOutputCtrl.text = updated.maxOutputChars.toString();
+          sessionMaxEntriesCtrl.text = updated.sessionMaxEntries.toString();
+          enabled = updated.isEnabled;
+          noSwearing = updated.noSwearing;
+          sessionEnabled = updated.sessionEnabled;
+          saving = false;
+        });
+
+        return true;
+      } on ApiException catch (e) {
+        setInner(() {
+          localError = e.message;
+          saving = false;
+        });
+        return false;
+      } catch (e) {
+        setInner(() {
+          localError = e.toString();
+          saving = false;
+        });
+        return false;
+      }
+    }
+
     final res = await showDialog<String>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setInner) {
           final canCopy = _withUsername(currentPub.publicUrl);
-          final rawUrl = currentPub.publicUrl;
-          final getTemplate = rawUrl == null ? null : _overlayUrlTemplate(rawUrl);
-          final getTemplateWithUser = canCopy == null ? null : _overlayUrlTemplate(canCopy);
-
           final overlayUrl = _withUsername(currentPub.overlayUrl);
           final streamUrl = _withUsername(currentPub.streamUrl);
+
+          final rawForCopy = _withUsername(currentPub.publicUrl);
+
+          final twitchTemplateUrl = (rawForCopy == null || rawForCopy.isEmpty)
+              ? null
+              : _twitchTemplateUrl(rawForCopy, includeAdvanced: includeAdvancedUrlFields);
+
+          final testUrl = (rawForCopy == null || rawForCopy.isEmpty)
+              ? null
+              : _testUrl(
+                  rawForCopy,
+                  eventId: testEventIdCtrl.text.trim().isEmpty
+                      ? 'test-${DateTime.now().millisecondsSinceEpoch}'
+                      : testEventIdCtrl.text.trim(),
+                  viewer: testUsernameCtrl.text,
+                  message: testMessageCtrl.text,
+                  eventType: testEventTypeCtrl.text,
+                  tier: testTierCtrl.text,
+                  months: testMonthsCtrl.text,
+                  bits: testBitsCtrl.text,
+                  amount: testAmountCtrl.text,
+                  raidViewers: testRaidViewersCtrl.text,
+                  channel: testChannelCtrl.text,
+                  includeAdvanced: includeAdvancedUrlFields,
+                );
 
           // Lazy-load session/stats once the dialog is visible.
           // This avoids extra latency before the editor opens.
@@ -1061,6 +1304,32 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
               name.isNotEmpty &&
               prompt.isNotEmpty &&
               [cooldownErr, durationErr, fontSizeErr, maxOutputErr, sessionMaxErr].every((e) => e == null);
+
+          final dirty =
+              nameCtrl.text.trim() != currentDetail.name ||
+              promptCtrl.text.trim() != currentDetail.prompt ||
+              enabled != currentDetail.isEnabled ||
+              (int.tryParse(cooldownCtrl.text.trim()) ?? currentDetail.cooldownMs) != currentDetail.cooldownMs ||
+              (int.tryParse(durationCtrl.text.trim()) ?? currentDetail.durationMs) != currentDetail.durationMs ||
+              textColorCtrl.text.trim() != currentDetail.textColor ||
+              fontFamilyCtrl.text.trim() != currentDetail.fontFamily ||
+              (int.tryParse(fontSizeCtrl.text.trim()) ?? currentDetail.fontSizePx) != currentDetail.fontSizePx ||
+              (int.tryParse(maxOutputCtrl.text.trim()) ?? currentDetail.maxOutputChars) != currentDetail.maxOutputChars ||
+              toneCtrl.text.trim() != currentDetail.tone ||
+              languageCtrl.text.trim() != currentDetail.language ||
+              noSwearing != currentDetail.noSwearing ||
+              sessionEnabled != currentDetail.sessionEnabled ||
+              (int.tryParse(sessionMaxEntriesCtrl.text.trim()) ?? currentDetail.sessionMaxEntries) !=
+                  currentDetail.sessionMaxEntries;
+
+          Future<bool> ensureSavedForTesting() async {
+            if (!dirty) return true;
+            if (!canSave) {
+              setInner(() => localError = 'Du har ændringer, men nogle felter er ugyldige. Ret dem eller tryk Close.');
+              return false;
+            }
+            return await saveInDialog(setInner);
+          }
 
           return AlertDialog(
             title: Text('Edit: ${detail!.name}'),
@@ -1302,6 +1571,14 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                         ),
+                        if (dirty)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Text(
+                              'Unsaved changes',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
                         if (currentPub.enabled)
                           OutlinedButton(
                             onPressed: () => disablePublic(setInner),
@@ -1392,26 +1669,47 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Some tools can only call a URL (GET). Use this template in your Twitch alert/HTML tool. Replace <event_id>/<viewer>/<message> with the tool\'s variables. event_id must be unique per event.',
+                      'Twitch bruger typisk {variable}. Brug URL\'en herunder som copy/paste (den er ikke URL-encoded). Sæt de variabler dit tool understøtter. event_id skal være unik pr event.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 8),
                     const _OverlayVariablesHint(),
                     const SizedBox(height: 8),
-                    if (getTemplate != null) ...[
-                      SelectableText(getTemplateWithUser ?? getTemplate),
+                    SwitchListTile(
+                      value: includeAdvancedUrlFields,
+                      onChanged: (v) => setInner(() => includeAdvancedUrlFields = v),
+                      title: const Text('Include advanced fields (tier/bits/months/...)'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    if (twitchTemplateUrl != null) ...[
+                      SelectableText(twitchTemplateUrl),
                       const SizedBox(height: 8),
                       Row(
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () => _copy(getTemplateWithUser ?? getTemplate),
+                              onPressed: () => _copy(twitchTemplateUrl),
                               icon: const Icon(Icons.copy),
-                              label: const Text('Copy GET template'),
+                              label: const Text('Copy Twitch template URL'),
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Test URL (konkrete værdier)',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 6),
+                      if (testUrl != null) ...[
+                        SelectableText(testUrl),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: () => _copy(testUrl),
+                          icon: const Icon(Icons.copy),
+                          label: const Text('Copy test URL'),
+                        ),
+                      ],
                     ] else ...[
                       Text(
                         'Enable public URL first to get the base token URL.',
@@ -1556,7 +1854,13 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
 
                     const SizedBox(height: 12),
                     FilledButton.tonal(
-                      onPressed: () => runPreview(setInner),
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              final ok = await ensureSavedForTesting();
+                              if (!ok) return;
+                              await runPreview(setInner);
+                            },
                       child: const Text('Preview prompt (no OpenAI call)'),
                     ),
                     if (preview != null) ...[
@@ -1573,12 +1877,24 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
 
                     const SizedBox(height: 12),
                     FilledButton(
-                      onPressed: () => testFire(setInner),
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              final ok = await ensureSavedForTesting();
+                              if (!ok) return;
+                              await testFire(setInner);
+                            },
                       child: const Text('Send test (POST)'),
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton(
-                      onPressed: () => testFireGet(setInner),
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              final ok = await ensureSavedForTesting();
+                              if (!ok) return;
+                              await testFireGet(setInner);
+                            },
                       child: const Text('Send test (GET)'),
                     ),
                     if (lastFire != null) ...[
@@ -1603,7 +1919,15 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                 child: const Text('Delete'),
               ),
               FilledButton(
-                onPressed: canSave ? () => Navigator.of(context).pop('save') : null,
+                onPressed: (!canSave || saving)
+                    ? null
+                    : () async {
+                        final nav = Navigator.of(context);
+                        final ok = await saveInDialog(setInner);
+                        if (ok) {
+                          nav.pop('saved');
+                        }
+                      },
                 child: const Text('Save'),
               ),
             ],
@@ -1613,6 +1937,12 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
     );
 
     if (res == null) return;
+
+    if (res == 'saved') {
+      // Saved inside the dialog (so Preview/Test can use latest settings).
+      await _load();
+      return;
+    }
 
     if (res == 'delete') {
       setState(() {
