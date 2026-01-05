@@ -136,11 +136,19 @@ class TwitchStreamInfo {
 }
 
 class TwitchSummary {
-  TwitchSummary({required this.user, required this.stream, required this.channel});
+  TwitchSummary({
+    required this.user,
+    required this.stream,
+    required this.channel,
+    required this.followerCount,
+    required this.followerError,
+  });
 
   final TwitchUser user;
   final TwitchStreamInfo? stream;
   final TwitchChannelInfo? channel;
+  final int? followerCount;
+  final String? followerError;
 
   factory TwitchSummary.fromJson(Map<String, dynamic> json) {
     return TwitchSummary(
@@ -151,6 +159,8 @@ class TwitchSummary {
       channel: (json['channel'] as Map<String, dynamic>?) == null
           ? null
           : TwitchChannelInfo.fromJson(json['channel'] as Map<String, dynamic>),
+      followerCount: (json['follower_count'] as num?)?.toInt(),
+      followerError: json['follower_error'] as String?,
     );
   }
 }

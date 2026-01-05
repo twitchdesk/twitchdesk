@@ -43,6 +43,22 @@ class _HomeScreenState extends State<HomeScreen> {
   TwitchStreamInfo? _twitchStream;
   TwitchChannelInfo? _twitchChannelInfo;
   bool? _twitchIsLive;
+  int? _twitchFollowerCount;
+  String? _twitchFollowerError;
+
+  String? _formatUptime(String? startedAt) {
+    final s = (startedAt ?? '').trim();
+    if (s.isEmpty) return null;
+    final dt = DateTime.tryParse(s);
+    if (dt == null) return null;
+    final d = DateTime.now().toUtc().difference(dt.toUtc());
+    if (d.isNegative) return null;
+
+    final hours = d.inHours;
+    final minutes = d.inMinutes.remainder(60);
+    if (hours > 0) return '${hours}h ${minutes}m';
+    return '${d.inMinutes}m';
+  }
 
   @override
   void initState() {
@@ -82,6 +98,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _twitchStream = null;
         _twitchChannelInfo = null;
         _twitchIsLive = null;
+        _twitchFollowerCount = null;
+        _twitchFollowerError = null;
       });
       return;
     }
@@ -93,6 +111,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _twitchStream = null;
       _twitchChannelInfo = null;
       _twitchIsLive = null;
+      _twitchFollowerCount = null;
+      _twitchFollowerError = null;
     });
 
     try {
@@ -103,6 +123,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final user = summary.user;
       final stream = summary.stream;
       final channel = summary.channel;
+      final followerCount = summary.followerCount;
+      final followerError = summary.followerError;
 
       final isLive = stream?.isLive;
 
@@ -112,6 +134,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _twitchStream = stream;
         _twitchChannelInfo = channel;
         _twitchIsLive = isLive;
+        _twitchFollowerCount = followerCount;
+        _twitchFollowerError = followerError;
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -191,9 +215,24 @@ class _HomeScreenState extends State<HomeScreen> {
                       : _twitchUser!.login,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
+              if ((_twitchFollowerCount ?? 0) > 0)
+                Text(
+                  'Followers: $_twitchFollowerCount',
+                  style: Theme.of(context).textTheme.bodySmall,
+                )
+              else if ((_twitchFollowerError ?? '').trim().isNotEmpty)
+                Text(
+                  _twitchFollowerError!,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               if ((_twitchIsLive ?? false) && (_twitchStream?.viewerCount ?? 0) > 0)
                 Text(
                   'Viewers: ${_twitchStream!.viewerCount}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              if ((_twitchIsLive ?? false) && (_formatUptime(_twitchStream?.startedAt) ?? '').isNotEmpty)
+                Text(
+                  'Uptime: ${_formatUptime(_twitchStream?.startedAt)}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               if ((_twitchStream?.gameName ?? '').trim().isNotEmpty)
