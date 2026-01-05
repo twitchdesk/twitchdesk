@@ -508,6 +508,58 @@ class ApiClient {
     return AiAlertFireResponse.fromJson(json);
   }
 
+  /// Builds an overlay-friendly GET URL for the public AI alert fire endpoint.
+  ///
+  /// The returned URL keeps the existing `token` query param and adds:
+  /// - `event_id` (required)
+  /// - `viewer` (optional)
+  /// - `message` (optional)
+  /// - `format` = json|text|html
+  Uri aiAlertFireGetUrl({
+    required String publicUrl,
+    required String eventId,
+    String? viewer,
+    String? message,
+    String format = 'json',
+  }) {
+    final base = Uri.parse(publicUrl);
+    final qp = <String, String>{
+      ...base.queryParameters,
+      'event_id': eventId,
+      'format': format,
+    };
+    final v = viewer?.trim();
+    if (v != null && v.isNotEmpty) qp['viewer'] = v;
+    final m = message?.trim();
+    if (m != null && m.isNotEmpty) qp['message'] = m;
+
+    return base.replace(queryParameters: qp);
+  }
+
+  /// Fires the public AI alert endpoint via GET.
+  ///
+  /// Prefer `format=json` for programmatic testing (it returns AiAlertFireResponse).
+  Future<AiAlertFireResponse> aiAlertFireGet({
+    required String publicUrl,
+    required String eventId,
+    String? viewer,
+    String? message,
+  }) async {
+    final url = aiAlertFireGetUrl(
+      publicUrl: publicUrl,
+      eventId: eventId,
+      viewer: viewer,
+      message: message,
+      format: 'json',
+    );
+    final resp = await _http.get(url);
+    if (resp.statusCode != 200) {
+      throw ApiException(resp.statusCode, _bodyOrReason(resp));
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    return AiAlertFireResponse.fromJson(json);
+  }
+
   String _bodyOrReason(http.Response resp) {
     final body = resp.body.trim();
     if (body.isNotEmpty) return body;

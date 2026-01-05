@@ -3,6 +3,203 @@ import 'package:flutter/services.dart';
 
 import '../api/api_client.dart';
 
+class _PromptExample {
+  const _PromptExample({
+    required this.title,
+    required this.description,
+    required this.prompt,
+  });
+
+  final String title;
+  final String description;
+  final String prompt;
+}
+
+class _HelpIcon extends StatelessWidget {
+  const _HelpIcon({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: message,
+      child: const Icon(Icons.help_outline, size: 18),
+    );
+  }
+}
+
+class _VariablesHint extends StatelessWidget {
+  const _VariablesHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodySmall;
+    return Row(
+      children: [
+        const _HelpIcon(
+          message:
+              'Du kan bruge variabler i prompten. De bliver udfyldt når alerten trigges.',
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Variabler: {{username}} (viewer/navn) og {{message}} (valgfri tekst).',
+            style: style,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OverlayVariablesHint extends StatelessWidget {
+  const _OverlayVariablesHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodySmall;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const _HelpIcon(
+              message:
+                  'GET URL\'en kan sættes ind i tools der kun kan åbne et link. Query params bliver til prompt-variabler.',
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'GET query params (typisk i Twitch/HTML tools):',
+                style: style,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '- event_id: unik id pr event (ellers duplicate)',
+          style: style,
+        ),
+        Text(
+          '- viewer/username: bliver til {{username}}',
+          style: style,
+        ),
+        Text(
+          '- message: bliver til {{message}}',
+          style: style,
+        ),
+        Text(
+          '- format=html: giver HTML output til overlay',
+          style: style,
+        ),
+      ],
+    );
+  }
+}
+
+class _PromptHelpCard extends StatelessWidget {
+  const _PromptHelpCard({
+    required this.onInsert,
+    required this.onCopy,
+  });
+
+  final void Function(String value) onInsert;
+  final Future<void> Function(String text) onCopy;
+
+  static const _examples = <_PromptExample>[
+    _PromptExample(
+      title: 'Kort follow alert (DA)',
+      description: 'Kort og tydelig, egnet til overlay.',
+      prompt:
+          'Skriv en kort dansk Twitch alert på 1 linje. Event: FOLLOW. Person: {{username}}. Ekstra: {{message}}. Ingen emojis.',
+    ),
+    _PromptExample(
+      title: 'Hype / celebration',
+      description: 'Mere energi, men stadig kort.',
+      prompt:
+          'Lav en kort dansk celebration alert (maks 12 ord). Event: {{message}}. Navn: {{username}}.',
+    ),
+    _PromptExample(
+      title: 'Raid velkomst',
+      description: 'Velkomst til raiders med call-to-action.',
+      prompt:
+          'Skriv en dansk velkomst til en raid fra {{username}}. Hold det under 2 linjer. Slut med en kort CTA.',
+    ),
+    _PromptExample(
+      title: 'TTS-venlig',
+      description: 'Undgår svære tegn og er let at læse op.',
+      prompt:
+          'Skriv en dansk TTS-venlig alert uden emojis og uden specialtegn. Navn: {{username}}. Event: {{message}}. Maks 15 ord.',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Prompt examples',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(width: 8),
+                const _HelpIcon(
+                  message:
+                      'Klik “Insert” for at udfylde prompt-feltet. Du kan derefter tilrette teksten.',
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ..._examples.map(
+              (e) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            e.title,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                        OutlinedButton(
+                          onPressed: () => onInsert(e.prompt),
+                          child: const Text('Insert'),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: () => onCopy(e.prompt),
+                          icon: const Icon(Icons.copy, size: 18),
+                          label: const Text('Copy'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      e.description,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class AiAlertsScreen extends StatefulWidget {
   const AiAlertsScreen({
     super.key,
@@ -143,6 +340,11 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                _PromptHelpCard(
+                  onInsert: (value) => promptCtrl.text = value,
+                  onCopy: _copy,
+                ),
+                const SizedBox(height: 16),
                 TextField(
                   controller: nameCtrl,
                   decoration: const InputDecoration(labelText: 'Name'),
@@ -158,6 +360,8 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                   minLines: 3,
                   maxLines: 10,
                 ),
+                const SizedBox(height: 8),
+                const _VariablesHint(),
                 const SizedBox(height: 12),
                 SwitchListTile(
                   value: enabled,
@@ -226,6 +430,19 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
     if (url == null || url.trim().isEmpty) return null;
     if (u == null || u.isEmpty) return url;
     return url.replaceAll('{username}', Uri.encodeComponent(u));
+  }
+
+  String _overlayUrlTemplate(String rawPublicUrl) {
+    // rawPublicUrl already contains ?token=...
+    final base = Uri.parse(rawPublicUrl);
+    final qp = <String, String>{
+      ...base.queryParameters,
+      'event_id': '<event_id>',
+      'viewer': '<viewer>',
+      'message': '<message>',
+      'format': 'html',
+    };
+    return base.replace(queryParameters: qp).toString();
   }
 
   Future<void> _openAlertEditor(AiAlertListItem item) async {
@@ -343,11 +560,45 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
       }
     }
 
+    Future<void> testFireGet(StateSetter setInner) async {
+      final raw = currentPub.publicUrl;
+      final url = _withUsername(raw);
+      final eventId = testEventIdCtrl.text.trim();
+      if (url == null || url.isEmpty) {
+        setInner(() => localError = 'Public URL not available (check PUBLIC_BASE_URL + enable).');
+        return;
+      }
+      if (eventId.isEmpty) {
+        setInner(() => localError = 'Missing event_id');
+        return;
+      }
+
+      try {
+        final res = await widget.api.aiAlertFireGet(
+          publicUrl: url,
+          eventId: eventId,
+          viewer: testUsernameCtrl.text.trim().isEmpty ? null : testUsernameCtrl.text.trim(),
+          message: testMessageCtrl.text.trim().isEmpty ? null : testMessageCtrl.text.trim(),
+        );
+        setInner(() {
+          lastFire = res;
+          localError = null;
+        });
+      } on ApiException catch (e) {
+        setInner(() => localError = e.message);
+      } catch (e) {
+        setInner(() => localError = e.toString());
+      }
+    }
+
     final res = await showDialog<String>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setInner) {
           final canCopy = _withUsername(currentPub.publicUrl);
+          final rawUrl = currentPub.publicUrl;
+          final getTemplate = rawUrl == null ? null : _overlayUrlTemplate(rawUrl);
+          final getTemplateWithUser = canCopy == null ? null : _overlayUrlTemplate(canCopy);
 
           return AlertDialog(
             title: Text('Edit: ${detail!.name}'),
@@ -369,6 +620,11 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                       decoration: const InputDecoration(labelText: 'Name'),
                     ),
                     const SizedBox(height: 12),
+                    _PromptHelpCard(
+                      onInsert: (value) => setInner(() => promptCtrl.text = value),
+                      onCopy: _copy,
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: promptCtrl,
                       decoration: const InputDecoration(
@@ -378,6 +634,8 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                       minLines: 3,
                       maxLines: 10,
                     ),
+                    const SizedBox(height: 8),
+                    const _VariablesHint(),
                     const SizedBox(height: 12),
                     SwitchListTile(
                       value: enabled,
@@ -445,6 +703,39 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                       ),
                     ],
                     const SizedBox(height: 16),
+                    Text(
+                      'Twitch/HTML setup (GET URL)',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Some tools can only call a URL (GET). Use this template in your Twitch alert/HTML tool. Replace <event_id>/<viewer>/<message> with the tool\'s variables. event_id must be unique per event.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    const _OverlayVariablesHint(),
+                    const SizedBox(height: 8),
+                    if (getTemplate != null) ...[
+                      SelectableText(getTemplateWithUser ?? getTemplate),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _copy(getTemplateWithUser ?? getTemplate),
+                              icon: const Icon(Icons.copy),
+                              label: const Text('Copy GET template'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      Text(
+                        'Enable public URL first to get the base token URL.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                    const SizedBox(height: 16),
                     const Divider(height: 1),
                     const SizedBox(height: 16),
                     Text(
@@ -454,24 +745,47 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: testEventIdCtrl,
-                      decoration: const InputDecoration(labelText: 'event_id'),
+                      decoration: const InputDecoration(
+                        labelText: 'event_id',
+                        suffixIcon: _HelpIcon(
+                          message:
+                              'Skal være unik for hvert event (ellers bliver det "duplicate"). Brug et timestamp/uuid fra dit tool.',
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: testUsernameCtrl,
-                      decoration: const InputDecoration(labelText: 'username (optional)'),
+                      decoration: const InputDecoration(
+                        labelText: 'viewer/username (optional)',
+                        suffixIcon: _HelpIcon(
+                          message:
+                              'Vises i prompten som {{username}}. Det kan være follower/sub/raider navn afhængigt af event.',
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: testMessageCtrl,
-                      decoration: const InputDecoration(labelText: 'message (optional)'),
+                      decoration: const InputDecoration(
+                        labelText: 'message (optional)',
+                        suffixIcon: _HelpIcon(
+                          message:
+                              'Vises i prompten som {{message}}. Brug fx event-type (follow/sub/raid) eller ekstra info.',
+                        ),
+                      ),
                       minLines: 2,
                       maxLines: 6,
                     ),
                     const SizedBox(height: 12),
                     FilledButton(
                       onPressed: () => testFire(setInner),
-                      child: const Text('Send test'),
+                      child: const Text('Send test (POST)'),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: () => testFireGet(setInner),
+                      child: const Text('Send test (GET)'),
                     ),
                     if (lastFire != null) ...[
                       const SizedBox(height: 12),
