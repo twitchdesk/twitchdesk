@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../widgets/cyber/cyber_background.dart';
+import 'ai_alerts_screen.dart';
 import 'features_settings_screen.dart';
 import 'settings_screen.dart';
 import 'templates_screen.dart';
@@ -239,6 +240,21 @@ class _HomeScreenState extends State<HomeScreen> {
                         Navigator.of(context).pop();
                         await _pushCyber(
                           TemplatesScreen(accessToken: widget.accessToken),
+                        );
+                      },
+              ),
+              ListTile(
+                leading: const Icon(Icons.auto_awesome),
+                title: const Text('AI Alerts'),
+                onTap: _busy
+                    ? null
+                    : () async {
+                        Navigator.of(context).pop();
+                        await _pushCyber(
+                          AiAlertsScreen(
+                            api: widget.api,
+                            accessToken: widget.accessToken,
+                          ),
                         );
                       },
               ),
