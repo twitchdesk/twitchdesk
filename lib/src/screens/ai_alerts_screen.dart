@@ -356,186 +356,254 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
 
     final ok = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('New AI alert'),
-        content: SizedBox(
-          width: 520,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _PromptHelpCard(
-                  onInsert: (value) => promptCtrl.text = value,
-                  onCopy: _copy,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                  autofocus: true,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: promptCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Prompt',
-                    hintText: 'Use {{username}} and {{message}}',
-                  ),
-                  minLines: 3,
-                  maxLines: 10,
-                ),
-                const SizedBox(height: 8),
-                const _VariablesHint(),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  value: enabled,
-                  onChanged: (v) => enabled = v,
-                  title: const Text('Enabled'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: cooldownCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Cooldown (ms)',
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setInner) {
+          String? nonNegativeIntError(TextEditingController c) {
+            final t = c.text.trim();
+            if (t.isEmpty) return 'Påkrævet';
+            final v = int.tryParse(t);
+            if (v == null) return 'Skal være et tal';
+            if (v < 0) return 'Skal være ≥ 0';
+            return null;
+          }
 
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Style (overlay)',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: durationCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Duration (ms)',
-                    suffixIcon: _HelpIcon(
-                      message: 'Hvor længe teksten bliver vist på overlay efter et event.',
-                    ),
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: textColorCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Text color (CSS)',
-                    hintText: 'white / #ffffff / rgb(255,255,255)',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: fontFamilyCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Font family (CSS)',
-                    hintText: 'system-ui, Segoe UI, Arial, sans-serif',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: fontSizeCtrl,
-                  decoration: const InputDecoration(labelText: 'Font size (px)'),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                ),
+          String? positiveIntError(TextEditingController c) {
+            final t = c.text.trim();
+            if (t.isEmpty) return 'Påkrævet';
+            final v = int.tryParse(t);
+            if (v == null) return 'Skal være et tal';
+            if (v <= 0) return 'Skal være > 0';
+            return null;
+          }
 
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Safety / quality',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: maxOutputCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Max output chars',
-                    suffixIcon: _HelpIcon(
-                      message: 'Sikkerhedsgrænse for længden af AI output (truncates).',
-                    ),
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: toneCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Tone (optional)',
-                    hintText: 'fx “hype”, “rolig”, “tør humor”',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: languageCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Language (optional)',
-                    hintText: 'fx da / en',
-                  ),
-                ),
-                SwitchListTile(
-                  value: noSwearing,
-                  onChanged: (v) => noSwearing = v,
-                  title: const Text('No swearing'),
-                  contentPadding: EdgeInsets.zero,
-                ),
+          final name = nameCtrl.text.trim();
+          final prompt = promptCtrl.text.trim();
 
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Session / context',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                ),
-                SwitchListTile(
-                  value: sessionEnabled,
-                  onChanged: (v) => sessionEnabled = v,
-                  title: const Text('Enable session memory'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: sessionMaxEntriesCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Max context entries',
-                    suffixIcon: _HelpIcon(
-                      message: 'Hvor mange tidligere entries der bruges som kontekst i prompten.',
+          final cooldownErr = nonNegativeIntError(cooldownCtrl);
+          final durationErr = positiveIntError(durationCtrl);
+          final fontSizeErr = positiveIntError(fontSizeCtrl);
+          final maxOutputErr = positiveIntError(maxOutputCtrl);
+          final sessionMaxErr = sessionEnabled ? positiveIntError(sessionMaxEntriesCtrl) : null;
+
+          final canCreate =
+              name.isNotEmpty &&
+              prompt.isNotEmpty &&
+              [cooldownErr, durationErr, fontSizeErr, maxOutputErr, sessionMaxErr].every((e) => e == null);
+
+          return AlertDialog(
+            title: const Text('New AI alert'),
+            content: SizedBox(
+              width: 520,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _PromptHelpCard(
+                      onInsert: (value) => setInner(() => promptCtrl.text = value),
+                      onCopy: _copy,
                     ),
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameCtrl,
+                      onChanged: (_) => setInner(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Name',
+                        errorText: name.isEmpty ? 'Påkrævet' : null,
+                      ),
+                      autofocus: true,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: promptCtrl,
+                      onChanged: (_) => setInner(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Prompt',
+                        hintText: 'Use {{username}} and {{message}}',
+                        errorText: prompt.isEmpty ? 'Påkrævet' : null,
+                      ),
+                      minLines: 3,
+                      maxLines: 10,
+                    ),
+                    const SizedBox(height: 8),
+                    const _VariablesHint(),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      value: enabled,
+                      onChanged: (v) => setInner(() => enabled = v),
+                      title: const Text('Enabled'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: cooldownCtrl,
+                      onChanged: (_) => setInner(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Cooldown (ms)',
+                        errorText: cooldownErr,
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Style (overlay)',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Bruges af overlay-siden (overlay_url).',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: durationCtrl,
+                      onChanged: (_) => setInner(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Duration (ms)',
+                        errorText: durationErr,
+                        suffixIcon: const _HelpIcon(
+                          message: 'Hvor længe teksten bliver vist på overlay efter et event.',
+                        ),
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: textColorCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Text color (CSS)',
+                        hintText: 'white / #ffffff / rgb(255,255,255)',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: fontFamilyCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Font family (CSS)',
+                        hintText: 'system-ui, Segoe UI, Arial, sans-serif',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: fontSizeCtrl,
+                      onChanged: (_) => setInner(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Font size (px)',
+                        errorText: fontSizeErr,
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Safety / quality',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: maxOutputCtrl,
+                      onChanged: (_) => setInner(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Max output chars',
+                        errorText: maxOutputErr,
+                        suffixIcon: const _HelpIcon(
+                          message: 'Sikkerhedsgrænse for længden af AI output (truncates).',
+                        ),
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: toneCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Tone (optional)',
+                        hintText: 'fx “hype”, “rolig”, “tør humor”',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: languageCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Language (optional)',
+                        hintText: 'fx da / en',
+                      ),
+                    ),
+                    SwitchListTile(
+                      value: noSwearing,
+                      onChanged: (v) => setInner(() => noSwearing = v),
+                      title: const Text('No swearing'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Session / context',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    SwitchListTile(
+                      value: sessionEnabled,
+                      onChanged: (v) => setInner(() => sessionEnabled = v),
+                      title: const Text('Enable session memory'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: sessionMaxEntriesCtrl,
+                      onChanged: (_) => setInner(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Max context entries',
+                        errorText: sessionMaxErr,
+                        suffixIcon: const _HelpIcon(
+                          message: 'Hvor mange tidligere entries der bruges som kontekst i prompten.',
+                        ),
+                      ),
+                      enabled: sessionEnabled,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                    if (sessionEnabled)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Tip: session virker først når alerten er gemt (serveren bruger gemte settings).',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Create'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: canCreate ? () => Navigator.of(context).pop(true) : null,
+                child: const Text('Create'),
+              ),
+            ],
+          );
+        },
       ),
     );
 
@@ -607,6 +675,13 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
       'event_id': '<event_id>',
       'viewer': '<viewer>',
       'message': '<message>',
+      'event_type': '<event_type>',
+      'tier': '<tier>',
+      'months': '<months>',
+      'bits': '<bits>',
+      'amount': '<amount>',
+      'raid_viewers': '<raid_viewers>',
+      'channel': '<channel>',
       'format': 'html',
     };
     return base.replace(queryParameters: qp).toString();
@@ -955,6 +1030,38 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
             });
           }
 
+          String? nonNegativeIntError(TextEditingController c) {
+            final t = c.text.trim();
+            if (t.isEmpty) return 'Påkrævet';
+            final v = int.tryParse(t);
+            if (v == null) return 'Skal være et tal';
+            if (v < 0) return 'Skal være ≥ 0';
+            return null;
+          }
+
+          String? positiveIntError(TextEditingController c) {
+            final t = c.text.trim();
+            if (t.isEmpty) return 'Påkrævet';
+            final v = int.tryParse(t);
+            if (v == null) return 'Skal være et tal';
+            if (v <= 0) return 'Skal være > 0';
+            return null;
+          }
+
+          final name = nameCtrl.text.trim();
+          final prompt = promptCtrl.text.trim();
+
+          final cooldownErr = nonNegativeIntError(cooldownCtrl);
+          final durationErr = positiveIntError(durationCtrl);
+          final fontSizeErr = positiveIntError(fontSizeCtrl);
+          final maxOutputErr = positiveIntError(maxOutputCtrl);
+          final sessionMaxErr = sessionEnabled ? positiveIntError(sessionMaxEntriesCtrl) : null;
+
+          final canSave =
+              name.isNotEmpty &&
+              prompt.isNotEmpty &&
+              [cooldownErr, durationErr, fontSizeErr, maxOutputErr, sessionMaxErr].every((e) => e == null);
+
           return AlertDialog(
             title: Text('Edit: ${detail!.name}'),
             content: SizedBox(
@@ -972,7 +1079,11 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     ],
                     TextField(
                       controller: nameCtrl,
-                      decoration: const InputDecoration(labelText: 'Name'),
+                      onChanged: (_) => setInner(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Name',
+                        errorText: name.isEmpty ? 'Påkrævet' : null,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     _PromptHelpCard(
@@ -982,6 +1093,7 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: promptCtrl,
+                      onChanged: (_) => setInner(() {}),
                       decoration: const InputDecoration(
                         labelText: 'Prompt',
                         hintText: 'Use {{username}} and {{message}}',
@@ -1001,7 +1113,11 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: cooldownCtrl,
-                      decoration: const InputDecoration(labelText: 'Cooldown (ms)'),
+                      onChanged: (_) => setInner(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Cooldown (ms)',
+                        errorText: cooldownErr,
+                      ),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     ),
@@ -1016,9 +1132,11 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: durationCtrl,
-                      decoration: const InputDecoration(
+                      onChanged: (_) => setInner(() {}),
+                      decoration: InputDecoration(
                         labelText: 'Duration (ms)',
-                        suffixIcon: _HelpIcon(message: 'Hvor længe teksten bliver vist på overlay.'),
+                        errorText: durationErr,
+                        suffixIcon: const _HelpIcon(message: 'Hvor længe teksten bliver vist på overlay.'),
                       ),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -1042,7 +1160,11 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: fontSizeCtrl,
-                      decoration: const InputDecoration(labelText: 'Font size (px)'),
+                      onChanged: (_) => setInner(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Font size (px)',
+                        errorText: fontSizeErr,
+                      ),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     ),
@@ -1057,9 +1179,12 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: maxOutputCtrl,
-                      decoration: const InputDecoration(
+                      onChanged: (_) => setInner(() {}),
+                      decoration: InputDecoration(
                         labelText: 'Max output chars',
-                        suffixIcon: _HelpIcon(message: 'Sikkerhedsgrænse for output længde (truncates).'),
+                        errorText: maxOutputErr,
+                        suffixIcon:
+                            const _HelpIcon(message: 'Sikkerhedsgrænse for output længde (truncates).'),
                       ),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -1113,13 +1238,25 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     ),
                     TextField(
                       controller: sessionMaxEntriesCtrl,
-                      decoration: const InputDecoration(
+                      onChanged: (_) => setInner(() {}),
+                      enabled: sessionEnabled,
+                      decoration: InputDecoration(
                         labelText: 'Max context entries',
-                        suffixIcon: _HelpIcon(message: 'Hvor mange tidligere entries der bruges som kontekst.'),
+                        errorText: sessionMaxErr,
+                        suffixIcon:
+                            const _HelpIcon(message: 'Hvor mange tidligere entries der bruges som kontekst.'),
                       ),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     ),
+                    if (sessionEnabled)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Tip: Session controls bruger serverens gemte settings — tryk Save efter ændringer.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
                     const SizedBox(height: 8),
                     if (session != null)
                       Text(
@@ -1466,7 +1603,7 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                 child: const Text('Delete'),
               ),
               FilledButton(
-                onPressed: () => Navigator.of(context).pop('save'),
+                onPressed: canSave ? () => Navigator.of(context).pop('save') : null,
                 child: const Text('Save'),
               ),
             ],
@@ -1533,6 +1670,45 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
           sessionEnabled: sessionEnabled,
           sessionMaxEntries: sessionMaxEntries,
         );
+
+        // Re-fetch and inform if server clamped/adjusted values.
+        try {
+          final updated = await widget.api.aiAlertsGet(
+            accessToken: widget.accessToken,
+            alertId: item.id,
+          );
+
+          final adjustments = <String>[];
+          void checkNum(String label, int wanted, int got) {
+            if (wanted != got) adjustments.add('$label $wanted → $got');
+          }
+
+          void checkBool(String label, bool wanted, bool got) {
+            if (wanted != got) adjustments.add('$label $wanted → $got');
+          }
+
+          checkNum('cooldown_ms', cooldownMs, updated.cooldownMs);
+          checkNum('duration_ms', durationMs, updated.durationMs);
+          checkNum('font_size_px', fontSizePx, updated.fontSizePx);
+          checkNum('max_output_chars', maxOutputChars, updated.maxOutputChars);
+          checkBool('session_enabled', sessionEnabled, updated.sessionEnabled);
+          if (sessionEnabled) {
+            checkNum('session_max_entries', sessionMaxEntries, updated.sessionMaxEntries);
+          }
+          checkBool('no_swearing', noSwearing, updated.noSwearing);
+          checkBool('is_enabled', enabled, updated.isEnabled);
+
+          if (adjustments.isNotEmpty && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Server adjusted: ${adjustments.join(', ')}'),
+              ),
+            );
+          }
+        } catch (_) {
+          // If this fails, we still saved successfully; ignore.
+        }
+
         await _load();
       } on ApiException catch (e) {
         setState(() => _error = e.message);
