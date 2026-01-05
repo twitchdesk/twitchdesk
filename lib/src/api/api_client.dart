@@ -374,6 +374,29 @@ class ApiClient {
     return token;
   }
 
+  Future<String> register({required String username, required String password}) async {
+    final resp = await _http.post(
+      AppConfig.apiUri('/v1/auth/register'),
+      headers: const {'content-type': 'application/json'},
+      body: jsonEncode({
+        'username': username,
+        'password': password,
+        // Backend requires a config object; defaults are applied server-side.
+        'config': <String, dynamic>{},
+      }),
+    );
+    if (resp.statusCode != 200) {
+      throw ApiException(resp.statusCode, _bodyOrReason(resp));
+    }
+
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    final token = (json['access_token'] as String?)?.trim() ?? '';
+    if (token.isEmpty) {
+      throw ApiException(500, 'missing access_token in response');
+    }
+    return token;
+  }
+
   Future<MeResponse> me({required String accessToken}) async {
     final resp = await _http.get(
       AppConfig.apiUri('/v1/users/me'),
