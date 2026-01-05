@@ -162,6 +162,7 @@ class AiAlertDetailResponse {
 
     // Safety / quality
     required this.maxOutputChars,
+    required this.fallbackText,
     required this.tone,
     required this.language,
     required this.noSwearing,
@@ -186,6 +187,7 @@ class AiAlertDetailResponse {
 
   // Safety / quality
   final int maxOutputChars;
+  final String fallbackText;
   final String tone;
   final String language;
   final bool noSwearing;
@@ -210,6 +212,7 @@ class AiAlertDetailResponse {
       fontSizePx: (json['font_size_px'] as num?)?.toInt() ?? 32,
 
       maxOutputChars: (json['max_output_chars'] as num?)?.toInt() ?? 200,
+      fallbackText: (json['fallback_text'] as String?)?.trim() ?? '',
       tone: (json['tone'] as String?)?.trim() ?? '',
       language: (json['language'] as String?)?.trim() ?? '',
       noSwearing: (json['no_swearing'] as bool?) ?? false,
@@ -324,6 +327,43 @@ class AiAlertStatsResponse {
       days: list
           .whereType<Map<String, dynamic>>()
           .map(AiAlertStatsDay.fromJson)
+          .toList(growable: false),
+    );
+  }
+}
+
+class AiAlertRecentVarsEvent {
+  AiAlertRecentVarsEvent({
+    required this.eventId,
+    required this.createdAtEpoch,
+    required this.vars,
+  });
+
+  final String eventId;
+  final double createdAtEpoch;
+  final Map<String, String> vars;
+
+  factory AiAlertRecentVarsEvent.fromJson(Map<String, dynamic> json) {
+    final rawVars = (json['vars'] as Map<String, dynamic>?) ?? const {};
+    return AiAlertRecentVarsEvent(
+      eventId: (json['event_id'] as String?) ?? '',
+      createdAtEpoch: (json['created_at_epoch'] as num?)?.toDouble() ?? 0.0,
+      vars: rawVars.map((k, v) => MapEntry(k, v.toString())),
+    );
+  }
+}
+
+class AiAlertRecentVarsResponse {
+  AiAlertRecentVarsResponse({required this.events});
+
+  final List<AiAlertRecentVarsEvent> events;
+
+  factory AiAlertRecentVarsResponse.fromJson(Map<String, dynamic> json) {
+    final list = (json['events'] as List<dynamic>?) ?? const [];
+    return AiAlertRecentVarsResponse(
+      events: list
+          .whereType<Map<String, dynamic>>()
+          .map(AiAlertRecentVarsEvent.fromJson)
           .toList(growable: false),
     );
   }
@@ -535,6 +575,7 @@ class ApiClient {
     String fontFamily = 'system-ui, Segoe UI, Arial, sans-serif',
     int fontSizePx = 32,
     int maxOutputChars = 200,
+    String fallbackText = '',
     String tone = '',
     String language = '',
     bool noSwearing = false,
@@ -558,6 +599,7 @@ class ApiClient {
         'font_family': fontFamily,
         'font_size_px': fontSizePx,
         'max_output_chars': maxOutputChars,
+        'fallback_text': fallbackText,
         'tone': tone,
         'language': language,
         'no_swearing': noSwearing,
@@ -600,6 +642,7 @@ class ApiClient {
     String fontFamily = 'system-ui, Segoe UI, Arial, sans-serif',
     int fontSizePx = 32,
     int maxOutputChars = 200,
+    String fallbackText = '',
     String tone = '',
     String language = '',
     bool noSwearing = false,
@@ -623,6 +666,7 @@ class ApiClient {
         'font_family': fontFamily,
         'font_size_px': fontSizePx,
         'max_output_chars': maxOutputChars,
+        'fallback_text': fallbackText,
         'tone': tone,
         'language': language,
         'no_swearing': noSwearing,
@@ -944,6 +988,24 @@ class ApiClient {
     }
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
     return AiAlertStatsResponse.fromJson(json);
+  }
+
+  Future<AiAlertRecentVarsResponse> aiAlertRecentVars({
+    required String accessToken,
+    required String alertId,
+    int limit = 10,
+  }) async {
+    final uri = AppConfig.apiUri('/v1/ai/alerts/$alertId/recent-vars')
+        .replace(queryParameters: {'limit': limit.toString()});
+    final resp = await _http.get(
+      uri,
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+    if (resp.statusCode != 200) {
+      throw ApiException(resp.statusCode, _bodyOrReason(resp));
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    return AiAlertRecentVarsResponse.fromJson(json);
   }
 
   String _bodyOrReason(http.Response resp) {

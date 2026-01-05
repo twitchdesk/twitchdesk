@@ -363,6 +363,7 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
 
     // Safety
     final maxOutputCtrl = TextEditingController(text: '200');
+    final fallbackCtrl = TextEditingController(text: '');
     final toneCtrl = TextEditingController(text: '');
     final languageCtrl = TextEditingController(text: 'da');
     var noSwearing = false;
@@ -545,6 +546,17 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      controller: fallbackCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Fallback text (optional)',
+                        hintText:
+                            'Vises hvis AI fejler eller returnerer tom tekst. Variabler virker også her.',
+                      ),
+                      minLines: 2,
+                      maxLines: 6,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
                       controller: toneCtrl,
                       decoration: const InputDecoration(
                         labelText: 'Tone (optional)',
@@ -661,6 +673,7 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
             : fontFamilyCtrl.text.trim(),
         fontSizePx: fontSizePx,
         maxOutputChars: maxOutputChars,
+        fallbackText: fallbackCtrl.text.trim(),
         tone: toneCtrl.text.trim(),
         language: languageCtrl.text.trim(),
         noSwearing: noSwearing,
@@ -818,6 +831,7 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
 
     // Safety
     final maxOutputCtrl = TextEditingController(text: detail.maxOutputChars.toString());
+    final fallbackCtrl = TextEditingController(text: detail.fallbackText);
     final toneCtrl = TextEditingController(text: detail.tone);
     final languageCtrl = TextEditingController(text: detail.language);
     var noSwearing = detail.noSwearing;
@@ -1024,6 +1038,8 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
     AiAlertPreviewResponse? preview;
     AiAlertSessionResponse? session;
     AiAlertStatsResponse? stats;
+    AiAlertRecentVarsResponse? recentVars;
+    var recentVarsLoading = false;
     String? localError;
 
     var includeAdvancedUrlFields = <String>[
@@ -1295,6 +1311,36 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
       }
     }
 
+    Future<void> refreshRecentVars(StateSetter setInner) async {
+      if (recentVarsLoading) return;
+      setInner(() {
+        recentVarsLoading = true;
+        localError = null;
+      });
+
+      try {
+        final res = await widget.api.aiAlertRecentVars(
+          accessToken: widget.accessToken,
+          alertId: item.id,
+          limit: 10,
+        );
+        setInner(() {
+          recentVars = res;
+          recentVarsLoading = false;
+        });
+      } on ApiException catch (e) {
+        setInner(() {
+          localError = e.message;
+          recentVarsLoading = false;
+        });
+      } catch (e) {
+        setInner(() {
+          localError = e.toString();
+          recentVarsLoading = false;
+        });
+      }
+    }
+
     Future<bool> saveInDialog(StateSetter setInner) async {
       if (saving) return false;
 
@@ -1309,6 +1355,7 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
       final durationMs = parseIntOr(durationCtrl, 4500);
       final fontSizePx = parseIntOr(fontSizeCtrl, 32);
       final maxOutputChars = parseIntOr(maxOutputCtrl, 200);
+      final fallbackText = fallbackCtrl.text.trim();
       final sessionMaxEntries = parseIntOr(sessionMaxEntriesCtrl, 10);
 
       try {
@@ -1326,6 +1373,7 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
               : fontFamilyCtrl.text.trim(),
           fontSizePx: fontSizePx,
           maxOutputChars: maxOutputChars,
+          fallbackText: fallbackText,
           tone: toneCtrl.text.trim(),
           language: languageCtrl.text.trim(),
           noSwearing: noSwearing,
@@ -1372,6 +1420,7 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
           durationCtrl.text = updated.durationMs.toString();
           fontSizeCtrl.text = updated.fontSizePx.toString();
           maxOutputCtrl.text = updated.maxOutputChars.toString();
+          fallbackCtrl.text = updated.fallbackText;
           sessionMaxEntriesCtrl.text = updated.sessionMaxEntries.toString();
           enabled = updated.isEnabled;
           noSwearing = updated.noSwearing;
@@ -1737,6 +1786,17 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      controller: fallbackCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Fallback text (optional)',
+                        hintText:
+                            'Vises hvis AI fejler eller returnerer tom tekst. Variabler virker også her.',
+                      ),
+                      minLines: 2,
+                      maxLines: 6,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
                       controller: toneCtrl,
                       decoration: const InputDecoration(
                         labelText: 'Tone (optional)',
@@ -1951,6 +2011,79 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
                     ),
                     const SizedBox(height: 8),
                     const _OverlayVariablesHint(),
+
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Recent variables (debug)',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Refresh recent variables',
+                          onPressed: () => refreshRecentVars(setInner),
+                          icon: const Icon(Icons.refresh),
+                        ),
+                      ],
+                    ),
+                    if (recentVarsLoading)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          'Loading…',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      )
+                    else if (recentVars == null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          'Tryk refresh efter dit tool har sendt et event. Viser seneste inputs + ekstra query params.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      )
+                    else if (recentVars!.events.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          'Ingen events endnu.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      )
+                    else
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: recentVars!.events.map((ev) {
+                          final keys = ev.vars.keys.toList()..sort();
+                          final shown = keys.take(12);
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'event_id: ${ev.eventId}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                const SizedBox(height: 4),
+                                ...shown.map(
+                                  (k) => Text(
+                                    '$k: ${ev.vars[k] ?? ''}',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ),
+                                if (keys.length > 12)
+                                  Text(
+                                    '… +${keys.length - 12} more',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                              ],
+                            ),
+                          );
+                        }).toList(growable: false),
+                      ),
                     const SizedBox(height: 8),
                     SwitchListTile(
                       value: includeAdvancedUrlFields,
