@@ -30,6 +30,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _clientIdCtrl = TextEditingController();
   final _clientSecretCtrl = TextEditingController();
+  final _twitchChannelCtrl = TextEditingController();
 
   late ThemeMode _themeMode;
   late String _accentName;
@@ -53,6 +54,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _clientIdCtrl.dispose();
     _clientSecretCtrl.dispose();
+    _twitchChannelCtrl.dispose();
     super.dispose();
   }
 
@@ -67,6 +69,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
 
       _clientIdCtrl.text = me.twitchClientId;
+      _twitchChannelCtrl.text = (me.twitchChannel ?? '').trim();
 
       setState(() {
         _me = me;
@@ -94,6 +97,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         twitchClientSecret: _clientSecretCtrl.text.trim().isEmpty
             ? null
             : _clientSecretCtrl.text.trim(),
+        twitchChannel: _twitchChannelCtrl.text.trim(),
       );
 
       _clientSecretCtrl.clear();
@@ -257,6 +261,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text('Twitch App', style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _twitchChannelCtrl,
+                          enabled: !_busy,
+                          decoration: const InputDecoration(
+                            labelText: 'Twitch username',
+                            hintText: 'e.g. shroud',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: _clientIdCtrl,

@@ -37,6 +37,11 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _error;
   MeResponse? _me;
 
+  bool _twitchBusy = false;
+  String? _twitchError;
+  TwitchUser? _twitchUser;
+  bool? _twitchIsLive;
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final me = await widget.api.me(accessToken: widget.accessToken);
       if (!mounted) return;
       setState(() => _me = me);
+      await _loadTwitchSummary(me);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
@@ -61,6 +67,142 @@ class _HomeScreenState extends State<HomeScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _loadTwitchSummary(MeResponse me) async {
+    final login = (me.twitchChannel ?? '').trim();
+    if (login.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _twitchBusy = false;
+        _twitchError = null;
+        _twitchUser = null;
+        _twitchIsLive = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _twitchBusy = true;
+      _twitchError = null;
+      _twitchUser = null;
+      _twitchIsLive = null;
+    });
+
+    try {
+      final users = await widget.api.twitchUsers(
+        accessToken: widget.accessToken,
+        login: login,
+      );
+      final user = users.isNotEmpty ? users.first : null;
+
+      bool? isLive;
+      try {
+        final statuses = await widget.api.channelStatus(accessToken: widget.accessToken);
+        final match = statuses.firstWhere(
+          (s) => s.login.toLowerCase() == login.toLowerCase(),
+          orElse: () => ChannelStatus(login: '', isLive: false),
+        );
+        if (match.login.isNotEmpty) {
+          isLive = match.isLive;
+        }
+      } catch (_) {
+        // Ignore status failures (often missing app credentials).
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _twitchUser = user;
+        _twitchIsLive = isLive;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _twitchError = e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _twitchError = e.toString());
+    } finally {
+      if (mounted) setState(() => _twitchBusy = false);
+    }
+  }
+
+  Widget _twitchSummaryCard() {
+    final me = _me;
+    final login = (me?.twitchChannel ?? '').trim();
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: scheme.primary.withValues(alpha: 0.18),
+                  foregroundColor: scheme.onSurface,
+                  backgroundImage: (_twitchUser?.profileImageUrl ?? '').trim().isEmpty
+                      ? null
+                      : NetworkImage(_twitchUser!.profileImageUrl),
+                  child: (_twitchUser?.profileImageUrl ?? '').trim().isEmpty
+                      ? const Icon(Icons.person)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Twitch channel',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        login.isEmpty ? 'Not set' : '@$login',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                if (_twitchBusy) const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+              ],
+            ),
+            if (login.isEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Set your Twitch username in Settings to show your channel on the home page.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ] else if (_twitchError != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _twitchError!,
+                style: TextStyle(color: scheme.error),
+              ),
+            ] else ...[
+              const SizedBox(height: 8),
+              if (_twitchUser != null)
+                Text(
+                  _twitchUser!.displayName.isNotEmpty
+                      ? _twitchUser!.displayName
+                      : _twitchUser!.login,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              if (_twitchIsLive != null)
+                Text(
+                  _twitchIsLive == true ? 'Live now' : 'Offline',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _pushCyber(Widget page) async {
@@ -353,6 +495,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 14),
+                _twitchSummaryCard(),
+                const SizedBox(height: 12),
                 _dashTile(
                   icon: Icons.dashboard_customize,
                   title: 'Templates',

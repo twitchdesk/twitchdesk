@@ -51,6 +51,20 @@ class TwitchUser {
   }
 }
 
+class ChannelStatus {
+  ChannelStatus({required this.login, required this.isLive});
+
+  final String login;
+  final bool isLive;
+
+  factory ChannelStatus.fromJson(Map<String, dynamic> json) {
+    return ChannelStatus(
+      login: (json['login'] as String?) ?? '',
+      isLive: (json['is_live'] as bool?) ?? false,
+    );
+  }
+}
+
 class MeResponse {
   MeResponse({
     required this.username,
@@ -489,11 +503,13 @@ class ApiClient {
     required String accessToken,
     String? twitchClientId,
     String? twitchClientSecret,
+    String? twitchChannel,
     bool? publicTwitchAvatarEnabled,
   }) async {
     final body = <String, dynamic>{};
     if (twitchClientId != null) body['twitch_client_id'] = twitchClientId;
     if (twitchClientSecret != null) body['twitch_client_secret'] = twitchClientSecret;
+    if (twitchChannel != null) body['twitch_channel'] = twitchChannel;
     if (publicTwitchAvatarEnabled != null) {
       body['public_twitch_avatar_enabled'] = publicTwitchAvatarEnabled;
     }
@@ -509,6 +525,23 @@ class ApiClient {
     if (resp.statusCode != 200) {
       throw ApiException(resp.statusCode, _bodyOrReason(resp));
     }
+  }
+
+  Future<List<ChannelStatus>> channelStatus({required String accessToken}) async {
+    final resp = await _http.get(
+      AppConfig.apiUri('/v1/channels/status'),
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+    if (resp.statusCode != 200) {
+      throw ApiException(resp.statusCode, _bodyOrReason(resp));
+    }
+
+    final json = jsonDecode(resp.body);
+    final data = (json as List<dynamic>?) ?? const [];
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(ChannelStatus.fromJson)
+        .toList(growable: false);
   }
 
   // -------------------------------
