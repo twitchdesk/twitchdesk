@@ -701,7 +701,11 @@ class _AiAlertsScreenState extends State<AiAlertsScreen> {
         .map((e) => '${Uri.encodeQueryComponent(e.key)}=${encodeValue(e.value)}')
         .join('&');
 
-    final base = uri.replace(query: '').toString();
+    var base = uri.replace(query: '').toString();
+    // Dart can keep a trailing '?' when query is emptied. Ensure we never emit '??'.
+    if (base.endsWith('?')) {
+      base = base.substring(0, base.length - 1);
+    }
     return '$base?$query';
   }
 
